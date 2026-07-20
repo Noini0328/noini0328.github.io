@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ベイズ定理 電卓 — がん検診の的中率</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;500;600;700&family=IBM+Plex+Sans+JP:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#EEF1EC;
+    --panel:#FFFFFF;
+    --ink:#17262A;
+    --ink-soft:#4B5B57;
+    --line:#D7DBCF;
+    --teal:#0F6B66;
+    --teal-deep:#0A4C48;
+    --tp:#1F7A5C;   /* 真陽性: 見つかった人 */
+    --fn:#B23A2E;   /* 偽陰性: 見逃した人 */
+    --fp:#D98A3D;   /* 偽陽性: 誤って陽性 */
+    --tn:#3D6B99;   /* 真陰性: 正しく陰性 */
+    --tp-bg:#E4F1EA;
+    --fn-bg:#F7E4E1;
+    --fp-bg:#FBEEDD;
+    --tn-bg:#E4EBF3;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'IBM Plex Sans JP', sans-serif;
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3{font-family:'Spectral', serif; font-weight:600; margin:0 0 6px;}
+  .mono{font-family:'IBM Plex Mono', monospace;}
+  .wrap{
+    max-width:1180px;
+    margin:0 auto;
+    padding:28px 20px 60px;
+  }
+  header.top{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:8px;
+    border-bottom:2px solid var(--ink);
+    padding-bottom:14px;
+    margin-bottom:22px;
+  }
+  header.top .kicker{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    letter-spacing:0.14em;
+    color:var(--teal-deep);
+    text-transform:uppercase;
+  }
+  header.top h1{font-size:26px; letter-spacing:0.01em;}
+  header.top .sub{font-size:13px; color:var(--ink-soft);}
+
+  .layout{
+    display:grid;
+    grid-template-columns:320px 1fr;
+    gap:20px;
+    align-items:start;
+  }
+  @media (max-width:880px){
+    .layout{grid-template-columns:1fr;}
+  }
+
+  /* --- control panel --- */
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:4px;
+    padding:20px;
+  }
+  .panel-title{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    letter-spacing:0.12em;
+    text-transform:uppercase;
+    color:var(--teal-deep);
+    margin-bottom:14px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .panel-title::after{
+    content:"";
+    flex:1;
+    height:1px;
+    background:var(--line);
+  }
+  .field{margin-bottom:20px;}
+  .field:last-child{margin-bottom:0;}
+  .field-label{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    font-size:13px;
+    font-weight:600;
+    margin-bottom:6px;
+  }
+  .field-label .val{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:14px;
+    color:var(--teal-deep);
+    font-weight:600;
+  }
+  input[type=range]{
+    width:100%;
+    -webkit-appearance:none;
+    appearance:none;
+    height:4px;
+    background:var(--line);
+    border-radius:2px;
+    outline:none;
+    margin:8px 0 4px;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:16px;height:16px;
+    border-radius:50%;
+    background:var(--teal);
+    border:2px solid #fff;
+    box-shadow:0 0 0 1px var(--teal);
+    cursor:pointer;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:14px;height:14px;
+    border-radius:50%;
+    background:var(--teal);
+    border:2px solid #fff;
+    box-shadow:0 0 0 1px var(--teal);
+    cursor:pointer;
+  }
+  .field-note{font-size:11px; color:var(--ink-soft);}
+
+  .k-buttons{display:flex; gap:6px;}
+  .k-btn{
+    flex:1;
+    padding:8px 0;
+    text-align:center;
+    border:1px solid var(--line);
+    background:#fff;
+    border-radius:3px;
+    cursor:pointer;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:13px;
+    color:var(--ink-soft);
+    transition:all .15s ease;
+  }
+  .k-btn.active{
+    background:var(--teal);
+    border-color:var(--teal);
+    color:#fff;
+  }
+
+  .preset-group{margin-bottom:14px;}
+  .preset-group-label{font-size:11px; color:var(--ink-soft); margin-bottom:6px;}
+  .preset-btn{
+    display:block;
+    width:100%;
+    text-align:left;
+    background:#F7F8F5;
+    border:1px solid var(--line);
+    border-radius:3px;
+    padding:8px 10px;
+    font-size:12px;
+    color:var(--ink);
+    cursor:pointer;
+    margin-bottom:6px;
+    font-family:'IBM Plex Sans JP', sans-serif;
+    transition:border-color .15s ease, background .15s ease;
+  }
+  .preset-btn:hover{border-color:var(--teal); background:#EEF6F3;}
+  .preset-btn b{display:block; font-size:12.5px; margin-bottom:2px;}
+  .preset-btn span{color:var(--ink-soft); font-size:11px;}
+
+  /* --- main column --- */
+  .main-col{display:flex; flex-direction:column; gap:20px;}
+
+  .card{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:4px;
+    padding:22px 24px;
+  }
+  .card h2{font-size:17px; margin-bottom:4px;}
+  .card .desc{font-size:12.5px; color:var(--ink-soft); margin-bottom:16px;}
+
+  /* formula */
+  .formula-block{
+    background:#F7F8F5;
+    border:1px solid var(--line);
+    border-radius:4px;
+    padding:18px 20px;
+    margin-bottom:12px;
+    overflow-x:auto;
+  }
+  .formula-block .label{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10.5px;
+    letter-spacing:0.1em;
+    text-transform:uppercase;
+    color:var(--teal-deep);
+    margin-bottom:10px;
+  }
+  .frac{
+    display:inline-flex;
+    flex-direction:column;
+    align-items:center;
+    vertical-align:middle;
+    margin:0 4px;
+  }
+  .frac .num, .frac .den{padding:2px 6px; white-space:nowrap;}
+  .frac .num{border-bottom:1.5px solid var(--ink);}
+  .eqrow{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:14.5px;
+    display:flex;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:2px;
+    color:var(--ink);
+  }
+  .eqrow.small{font-size:13px; color:var(--teal-deep);}
+  .eqrow .op{margin:0 6px; color:var(--ink-soft);}
+  .result-badge{
+    display:inline-flex;
+    align-items:baseline;
+    gap:8px;
+    background:var(--teal);
+    color:#fff;
+    padding:10px 16px;
+    border-radius:3px;
+    font-family:'IBM Plex Mono', monospace;
+    margin-top:10px;
+  }
+  .result-badge .n{font-size:22px; font-weight:600;}
+  .result-badge .l{font-size:12px; opacity:.85;}
+
+  /* confusion matrix */
+  .matrix-wrap{display:grid; grid-template-columns:120px 1fr 1fr; gap:2px; margin-top:6px;}
+  .mx-corner{background:transparent;}
+  .mx-head{
+    background:var(--ink);
+    color:#fff;
+    font-size:12px;
+    font-weight:600;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:10px 4px;
+    text-align:center;
+  }
+  .mx-rowhead{
+    background:var(--ink);
+    color:#fff;
+    font-size:12px;
+    font-weight:600;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:10px 6px;
+    text-align:center;
+    writing-mode:vertical-rl;
+    text-orientation:mixed;
+  }
+  .mx-cell{
+    padding:16px 12px;
+    text-align:center;
+    border:1px solid rgba(0,0,0,.04);
+  }
+  .mx-cell .tag{font-size:11px; font-weight:600; letter-spacing:.04em; margin-bottom:6px;}
+  .mx-cell .count{font-family:'IBM Plex Mono', monospace; font-size:22px; font-weight:600;}
+  .mx-cell .pct{font-family:'IBM Plex Mono', monospace; font-size:11.5px; color:var(--ink-soft); margin-top:2px;}
+  .mx-tp{background:var(--tp-bg);} .mx-tp .tag,.mx-tp .count{color:var(--tp);}
+  .mx-fn{background:var(--fn-bg);} .mx-fn .tag,.mx-fn .count{color:var(--fn);}
+  .mx-fp{background:var(--fp-bg);} .mx-fp .tag,.mx-fp .count{color:var(--fp);}
+  .mx-tn{background:var(--tn-bg);} .mx-tn .tag,.mx-tn .count{color:var(--tn);}
+
+  .metrics-row{display:flex; gap:12px; margin-top:14px; flex-wrap:wrap;}
+  .metric{
+    flex:1;
+    min-width:150px;
+    border:1px solid var(--line);
+    border-radius:3px;
+    padding:12px 14px;
+    background:#fff;
+  }
+  .metric .m-label{font-size:11px; color:var(--ink-soft); margin-bottom:4px;}
+  .metric .m-val{font-family:'IBM Plex Mono', monospace; font-size:20px; font-weight:600;}
+  .metric.hi .m-val{color:var(--teal-deep);}
+
+  /* proportional bar */
+  .propbar{
+    display:flex;
+    width:100%;
+    height:54px;
+    border-radius:3px;
+    overflow:hidden;
+    margin:14px 0 8px;
+    border:1px solid var(--line);
+  }
+  .propseg{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:#fff;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    min-width:2px;
+    transition:width .25s ease;
+    white-space:nowrap;
+    overflow:hidden;
+  }
+  .seg-tp{background:var(--tp);}
+  .seg-fn{background:var(--fn);}
+  .seg-fp{background:var(--fp);}
+  .seg-tn{background:var(--tn);}
+  .propbar-legend{display:flex; gap:16px; flex-wrap:wrap; font-size:11.5px; color:var(--ink-soft);}
+  .propbar-legend span{display:inline-flex; align-items:center; gap:5px;}
+  .swatch{width:10px; height:10px; border-radius:2px; display:inline-block;}
+  .bar-note{font-size:11px; color:var(--ink-soft); margin-top:6px;}
+
+  /* sequential table */
+  table.seq{
+    width:100%;
+    border-collapse:collapse;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:13px;
+    margin-top:8px;
+  }
+  table.seq th, table.seq td{
+    padding:9px 10px;
+    text-align:right;
+    border-bottom:1px solid var(--line);
+  }
+  table.seq th:first-child, table.seq td:first-child{text-align:left;}
+  table.seq th{
+    font-family:'IBM Plex Sans JP', sans-serif;
+    font-size:11.5px;
+    color:var(--ink-soft);
+    font-weight:600;
+    border-bottom:2px solid var(--ink);
+  }
+  table.seq tr:last-child td{font-weight:600; color:var(--teal-deep); background:#F2F8F6;}
+
+  /* reference data */
+  .ref-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:12px;}
+  @media (max-width:760px){.ref-grid{grid-template-columns:1fr;}}
+  .ref-card{
+    border:1px solid var(--line);
+    border-radius:3px;
+    padding:14px 16px;
+    background:#F7F8F5;
+  }
+  .ref-card h3{font-size:14px; margin-bottom:8px;}
+  .ref-card .row{display:flex; justify-content:space-between; font-size:12.5px; padding:3px 0;}
+  .ref-card .row b{font-family:'IBM Plex Mono', monospace;}
+  .ref-foot{font-size:11px; color:var(--ink-soft); margin-top:10px; line-height:1.7;}
+
+  footer.note{
+    font-size:11.5px;
+    color:var(--ink-soft);
+    text-align:center;
+    margin-top:30px;
+    padding-top:16px;
+    border-top:1px solid var(--line);
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <div class="kicker">Bayes' Theorem Simulator — Cancer Screening</div>
+      <h1>ベイズ定理で見る、がん検診の的中率</h1>
+      <div class="sub">感度・特異度・有病率・対象人数・検査回数を動かして、混同行列の変化を確認する</div>
+    </div>
+  </header>
+
+  <div class="layout">
+
+    <!-- ============ CONTROL PANEL ============ -->
+    <div class="panel">
+      <div class="panel-title">パラメータ</div>
+
+      <div class="field">
+        <div class="field-label"><span>感度 Sensitivity（真陽性率）</span><span class="val" id="val-se">80.0%</span></div>
+        <input type="range" id="se" min="50" max="100" step="0.1" value="80">
+        <div class="field-note">病気の人を正しく「陽性」と判定できる割合</div>
+      </div>
+
+      <div class="field">
+        <div class="field-label"><span>特異度 Specificity（真陰性率）</span><span class="val" id="val-sp">90.0%</span></div>
+        <input type="range" id="sp" min="50" max="100" step="0.1" value="90">
+        <div class="field-note">健康な人を正しく「陰性」と判定できる割合</div>
+      </div>
+
+      <div class="field">
+        <div class="field-label"><span>有病率 Prevalence</span><span class="val" id="val-pv">0.10%</span></div>
+        <input type="range" id="pv" min="-200" max="170" step="1" value="-100">
+        <div class="field-note">対象集団のうち実際に病気を持つ割合（対数スケール）</div>
+      </div>
+
+      <div class="field">
+        <div class="field-label"><span>対象人数</span><span class="val" id="val-n">1,000,000人</span></div>
+        <input type="range" id="npop" min="200" max="810" step="1" value="600">
+        <div class="field-note">検診を受ける人数（対数スケール）</div>
+      </div>
+
+      <div class="field">
+        <div class="field-label"><span>検査回数（連続で陽性の場合）</span></div>
+        <div class="k-buttons" id="k-buttons">
+          <div class="k-btn active" data-k="1">1回</div>
+          <div class="k-btn" data-k="2">2回</div>
+          <div class="k-btn" data-k="3">3回</div>
+          <div class="k-btn" data-k="4">4回</div>
+          <div class="k-btn" data-k="5">5回</div>
+        </div>
+        <div class="field-note">同じ検査を独立に繰り返し、毎回陽性だった場合を想定</div>
+      </div>
+
+      <div class="panel-title" style="margin-top:22px;">プリセット：がん検診の目安</div>
+      <div class="preset-group">
+        <button class="preset-btn" data-se="70" data-sp="85" data-pv="0.10">
+          <b>胃がん検診（胃X線検査）</b>
+          <span>感度 約70% / 特異度 約85% / 有病率 約0.10%</span>
+        </button>
+        <button class="preset-btn" data-se="80" data-sp="90" data-pv="0.08">
+          <b>乳がん検診（マンモグラフィ）</b>
+          <span>感度 約80% / 特異度 約90% / 有病率 約0.08%</span>
+        </button>
+        <button class="preset-btn" data-se="65" data-sp="95" data-pv="0.15">
+          <b>大腸がん検診（便潜血検査）</b>
+          <span>感度 約65% / 特異度 約95% / 有病率 約0.15%</span>
+        </button>
+      </div>
+
+      <div class="panel-title" style="margin-top:22px;">プリセット：対象人数</div>
+      <div class="preset-group">
+        <button class="preset-btn" data-n="10000"><b>1万人</b><span>市区町村の検診規模</span></button>
+        <button class="preset-btn" data-n="1000000"><b>100万人</b><span>都道府県規模</span></button>
+        <button class="preset-btn" data-n="125000000"><b>日本の総人口</b><span>約1億2,500万人</span></button>
+      </div>
+    </div>
+
+    <!-- ============ MAIN COLUMN ============ -->
+    <div class="main-col">
+
+      <!-- Bayes formula -->
+      <div class="card">
+        <h2>ベイズの定理</h2>
+        <div class="desc">検査が陽性だったとき、本当に病気である確率 P(D+|T+) を求める</div>
+
+        <div class="formula-block">
+          <div class="label">一般式</div>
+          <div class="eqrow">
+            P(D+|T+) <span class="op">=</span>
+            <span class="frac">
+              <span class="num">P(T+|D+) · P(D+)</span>
+              <span class="den">P(T+|D+) · P(D+) + P(T+|D−) · P(D−)</span>
+            </span>
+          </div>
+        </div>
+
+        <div class="formula-block">
+          <div class="label">がん検診の記号に置き換える（検査 <span id="k-label-1">1</span> 回連続陽性）</div>
+          <div class="eqrow small">
+            P(D+|T+<sup id="k-sup-1">1</sup>) <span class="op">=</span>
+            <span class="frac">
+              <span class="num">感度<sup id="k-sup-2">1</sup> × 有病率</span>
+              <span class="den">感度<sup id="k-sup-3">1</sup> × 有病率 + (1−特異度)<sup id="k-sup-4">1</sup> × (1−有病率)</span>
+            </span>
+          </div>
+        </div>
+
+        <div class="formula-block">
+          <div class="label">現在の数値を代入</div>
+          <div class="eqrow" id="eq-substituted"></div>
+        </div>
+
+        <div class="result-badge">
+          <span class="n" id="ppv-big">—</span>
+          <span class="l">= 陽性的中率 PPV<br>（陽性でも本当は病気でない可能性の裏返し）</span>
+        </div>
+      </div>
+
+      <!-- Confusion matrix -->
+      <div class="card">
+        <h2>混同行列（Confusion Matrix）</h2>
+        <div class="desc" id="mx-desc">対象人数のうち、検査結果と実際の病状の組み合わせごとの人数</div>
+
+        <div class="matrix-wrap">
+          <div class="mx-corner"></div>
+          <div class="mx-head">実際に病気あり<br>D+</div>
+          <div class="mx-head">実際に病気なし<br>D−</div>
+
+          <div class="mx-rowhead">検査陽性 T+</div>
+          <div class="mx-cell mx-tp">
+            <div class="tag">真陽性 TP</div>
+            <div class="count" id="c-tp">—</div>
+            <div class="pct" id="p-tp">—</div>
+          </div>
+          <div class="mx-cell mx-fp">
+            <div class="tag">偽陽性 FP</div>
+            <div class="count" id="c-fp">—</div>
+            <div class="pct" id="p-fp">—</div>
+          </div>
+
+          <div class="mx-rowhead">検査陰性 T−</div>
+          <div class="mx-cell mx-fn">
+            <div class="tag">偽陰性 FN</div>
+            <div class="count" id="c-fn">—</div>
+            <div class="pct" id="p-fn">—</div>
+          </div>
+          <div class="mx-cell mx-tn">
+            <div class="tag">真陰性 TN</div>
+            <div class="count" id="c-tn">—</div>
+            <div class="pct" id="p-tn">—</div>
+          </div>
+        </div>
+
+        <div class="metrics-row">
+          <div class="metric hi">
+            <div class="m-label">陽性的中率 PPV = TP / (TP+FP)</div>
+            <div class="m-val" id="m-ppv">—</div>
+          </div>
+          <div class="metric hi">
+            <div class="m-label">陰性的中率 NPV = TN / (TN+FN)</div>
+            <div class="m-val" id="m-npv">—</div>
+          </div>
+          <div class="metric">
+            <div class="m-label">検査陽性者の総数</div>
+            <div class="m-val" id="m-postot">—</div>
+          </div>
+        </div>
+
+        <h3 style="margin-top:22px; font-size:14px;">対象人数全体に占める内訳</h3>
+        <div class="propbar" id="propbar"></div>
+        <div class="propbar-legend">
+          <span><i class="swatch" style="background:var(--tp)"></i>真陽性(TP)</span>
+          <span><i class="swatch" style="background:var(--fn)"></i>偽陰性(FN)</span>
+          <span><i class="swatch" style="background:var(--fp)"></i>偽陽性(FP)</span>
+          <span><i class="swatch" style="background:var(--tn)"></i>真陰性(TN)</span>
+        </div>
+        <div class="bar-note">※ 有病率が低いと帯が細くなりすぎるため、最小幅を確保して表示しています（実数は各カードを参照）</div>
+      </div>
+
+      <!-- sequential table -->
+      <div class="card" id="seq-card">
+        <h2>検査を繰り返すと確信度はどう変わるか</h2>
+        <div class="desc">毎回陽性だったと仮定し、1回ごとに事後確率を次の事前確率として更新（各検査は独立と仮定）</div>
+        <table class="seq">
+          <thead>
+            <tr><th>検査回数</th><th>その回の前の確率（事前）</th><th>陽性後の確率（事後）</th></tr>
+          </thead>
+          <tbody id="seq-body"></tbody>
+        </table>
+      </div>
+
+      <!-- reference data -->
+      <div class="card">
+        <h2>参考値</h2>
+        <div class="desc">日本のがん検診で一般に紹介される感度・特異度・有病率の目安（検査方法や年代・報告により幅があります）</div>
+        <div class="ref-grid">
+          <div class="ref-card">
+            <h3>胃がん検診（胃X線）</h3>
+            <div class="row"><span>感度</span><b>約60〜80%</b></div>
+            <div class="row"><span>特異度</span><b>約80〜90%</b></div>
+            <div class="row"><span>有病率目安</span><b>約0.05〜0.2%</b></div>
+          </div>
+          <div class="ref-card">
+            <h3>乳がん検診（マンモグラフィ）</h3>
+            <div class="row"><span>感度</span><b>約75〜90%</b></div>
+            <div class="row"><span>特異度</span><b>約85〜95%</b></div>
+            <div class="row"><span>有病率目安</span><b>約0.05〜0.15%</b></div>
+          </div>
+          <div class="ref-card">
+            <h3>大腸がん検診（便潜血）</h3>
+            <div class="row"><span>感度</span><b>約50〜70%</b></div>
+            <div class="row"><span>特異度</span><b>約90〜97%</b></div>
+            <div class="row"><span>有病率目安</span><b>約0.1〜0.2%</b></div>
+          </div>
+        </div>
+        <div class="ref-foot">
+          日本の総人口：約1億2,500万人（近年の概数）。上記はいずれも一般に紹介される目安の一例であり、実施年・施設・年齢層・診断基準によって数値は変動します。実際の検診の性能評価には最新の一次資料をご確認ください。
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <footer class="note">
+    このツールは教育目的の概算シミュレーターです。すべての検査は「有病率・感度・特異度が一定」「複数回検査は互いに独立」と単純化して計算しています。実際の医療判断には用いないでください。
+  </footer>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+const seEl = $('se'), spEl = $('sp'), pvEl = $('pv'), nEl = $('npop');
+let K = 1;
+
+// mapping helpers
+function pvFromSlider(v){ // v in [-200,170] -> exponent-ish mapping to percent 0.01% .. 50%
+  // slider maps linearly to log10(prevalence%) between log10(0.01)=-2 and log10(50)=1.69897
+  const min = -2, max = Math.log10(50);
+  const t = (v - (-200)) / (170 - (-200));
+  const log = min + t*(max-min);
+  return Math.pow(10, log);
+}
+function nFromSlider(v){ // v in [200,810] -> log10(N) between 2 (100) and 8.1 (~125,900,000)
+  const min=2, max=8.1;
+  const t = (v-200)/(810-200);
+  const log = min + t*(max-min);
+  return Math.round(Math.pow(10, log));
+}
+
+function fmtInt(x){ return Math.round(x).toLocaleString('ja-JP'); }
+function fmtPct(x, d=2){ return (x*100).toFixed(d) + '%'; }
+function fmtPct1(x){ return (x*100).toFixed(1) + '%'; }
+
+function compute(){
+  const Se = parseFloat(seEl.value)/100;
+  const Sp = parseFloat(spEl.value)/100;
+  const p  = pvFromSlider(parseFloat(pvEl.value))/100;
+  const N  = nFromSlider(parseFloat(nEl.value));
+
+  $('val-se').textContent = fmtPct1(Se);
+  $('val-sp').textContent = fmtPct1(Sp);
+  $('val-pv').textContent = (p*100 < 0.1 ? (p*100).toFixed(3) : (p*100).toFixed(2)) + '%';
+  $('val-n').textContent = fmtInt(N) + '人';
+
+  const effSe = Math.pow(Se, K);
+  const effFP = Math.pow(1-Sp, K); // effective false positive rate for "all K positive"
+
+  const Dpos = N*p;
+  const Dneg = N*(1-p);
+
+  const TP = Dpos*effSe;
+  const FN = Dpos*(1-effSe);
+  const FP = Dneg*effFP;
+  const TN = Dneg*(1-effFP);
+
+  const PPV = TP/(TP+FP);
+  const NPV = TN/(TN+FN);
+
+  // ---- confusion matrix render ----
+  $('c-tp').textContent = fmtInt(TP);
+  $('c-fn').textContent = fmtInt(FN);
+  $('c-fp').textContent = fmtInt(FP);
+  $('c-tn').textContent = fmtInt(TN);
+  $('p-tp').textContent = fmtPct(TP/N,3)+' of 全体';
+  $('p-fn').textContent = fmtPct(FN/N,3)+' of 全体';
+  $('p-fp').textContent = fmtPct(FP/N,3)+' of 全体';
+  $('p-tn').textContent = fmtPct(TN/N,3)+' of 全体';
+
+  $('m-ppv').textContent = fmtPct1(PPV);
+  $('m-npv').textContent = fmtPct1(NPV);
+  $('m-postot').textContent = fmtInt(TP+FP)+'人';
+
+  $('mx-desc').textContent = K===1
+    ? '対象人数のうち、検査結果と実際の病状の組み合わせごとの人数'
+    : `対象人数のうち、${K}回連続で陽性だった場合の組み合わせごとの人数（各回独立と仮定）`;
+
+  // ---- proportional bar ----
+  const total = TP+FN+FP+TN;
+  const segs = [
+    {v:TP, cls:'seg-tp', label:'TP'},
+    {v:FN, cls:'seg-fn', label:'FN'},
+    {v:FP, cls:'seg-fp', label:'FP'},
+    {v:TN, cls:'seg-tn', label:'TN'}
+  ];
+  const minPct = 1.2; // minimum visible width %
+  let raw = segs.map(s => Math.max((s.v/total)*100, s.v>0?minPct:0));
+  let sum = raw.reduce((a,b)=>a+b,0);
+  raw = raw.map(x => x*100/sum);
+  const bar = $('propbar');
+  bar.innerHTML = '';
+  segs.forEach((s,i)=>{
+    const div = document.createElement('div');
+    div.className = 'propseg '+s.cls;
+    div.style.width = raw[i]+'%';
+    div.textContent = raw[i]>6 ? s.label : '';
+    div.title = s.label+': '+fmtInt(s.v)+'人';
+    bar.appendChild(div);
+  });
+
+  // ---- Bayes formula substitution ----
+  const kTxt = K.toString();
+  ['k-sup-1','k-sup-2','k-sup-3','k-sup-4'].forEach(id=>{ $(id).textContent = K>1? kTxt : ''; });
+  $('k-label-1').textContent = kTxt;
+
+  const seStr = Se.toFixed(3);
+  const spStr = (1-Sp).toFixed(3);
+  const pStr = p<0.001 ? p.toFixed(5) : p.toFixed(4);
+  const oneMinusP = (1-p).toFixed(4);
+  const seK = K>1 ? `${seStr}<sup>${K}</sup>` : seStr;
+  const fpK = K>1 ? `(1−${Sp.toFixed(3)})<sup>${K}</sup>` : `(1−${Sp.toFixed(3)})`;
+
+  $('eq-substituted').innerHTML =
+    `P(D+|T+${K>1?'<sup>'+K+'</sup>':''}) <span class="op">=</span> `+
+    `<span class="frac"><span class="num">${seK} × ${pStr}</span>`+
+    `<span class="den">${seK} × ${pStr} + ${fpK} × ${oneMinusP}</span></span>`+
+    ` <span class="op">=</span> <b>${fmtPct1(PPV)}</b>`;
+
+  $('ppv-big').textContent = fmtPct1(PPV);
+
+  // ---- sequential table ----
+  const seqBody = $('seq-body');
+  seqBody.innerHTML='';
+  let prior = p;
+  for(let i=1;i<=K;i++){
+    const post = (Se*prior) / (Se*prior + (1-Sp)*(1-prior));
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${i}回目 陽性</td><td>${fmtPct(prior,3)}</td><td>${fmtPct(post,3)}</td>`;
+    seqBody.appendChild(tr);
+    prior = post;
+  }
+  $('seq-card').style.display = 'block';
+}
+
+// events
+[seEl,spEl,pvEl,nEl].forEach(el=> el.addEventListener('input', compute));
+
+document.querySelectorAll('.k-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.k-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    K = parseInt(btn.dataset.k);
+    compute();
+  });
+});
+
+document.querySelectorAll('.preset-btn[data-se]').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    seEl.value = btn.dataset.se;
+    spEl.value = btn.dataset.sp;
+    // convert prevalence % back to slider position
+    const pctVal = parseFloat(btn.dataset.pv);
+    const min=-2, max=Math.log10(50);
+    const log = Math.log10(pctVal);
+    const t = (log-min)/(max-min);
+    pvEl.value = Math.round(-200 + t*(170-(-200)));
+    compute();
+  });
+});
+
+document.querySelectorAll('.preset-btn[data-n]').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const nVal = parseFloat(btn.dataset.n);
+    const min=2, max=8.1;
+    const log = Math.log10(nVal);
+    const t = (log-min)/(max-min);
+    nEl.value = Math.round(200 + t*(810-200));
+    compute();
+  });
+});
+
+compute();
+</script>
+</body>
+</html>
