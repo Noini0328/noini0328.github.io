@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+```
+<title>urlscan.io Text Content Test Page</title>
+
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        line-height: 1.6;
+        margin: 40px;
+        max-width: 1000px;
+    }
+
+    section {
+        border: 1px solid #ccc;
+        padding: 20px;
+        margin: 20px 0;
+        border-radius: 8px;
+    }
+
+    .hidden-display {
+        display: none;
+    }
+
+    .hidden-visibility {
+        visibility: hidden;
+    }
+
+    .offscreen {
+        position: absolute;
+        left: -10000px;
+        top: 0;
+    }
+
+    .small-text {
+        font-size: 1px;
+    }
+
+    #status {
+        font-weight: bold;
+    }
+
+    iframe {
+        width: 100%;
+        height: 120px;
+        border: 1px solid #999;
+    }
+
+    canvas {
+        border: 1px solid #999;
+    }
+
+    .generated {
+        padding: 10px;
+        background: #eef;
+        margin-top: 10px;
+    }
+
+    .warning {
+        padding: 10px;
+        background: #fee;
+        border: 1px solid #f88;
+    }
+</style>
+```
+
+</head>
+
+<body>
+
+<h1>urlscan.io Text Content Test</h1>
+
+<p>
+    This page is designed to investigate which types of text are included
+    in urlscan.io's <code>text.content</code>.
+</p>
+
+<p id="status">
+    PAGE_STATUS_INITIAL_HTML_00001
+</p>
+
+<!-- ========================================================= -->
+
+<!-- A. Static visible HTML                                    -->
+
+<!-- ========================================================= -->
+
+<section>
+
+```
+<h2>A. Static visible HTML</h2>
+
+<p>
+    STATIC_VISIBLE_TEXT_10001
+</p>
+```
+
+</section>
+
+<!-- ========================================================= -->
+
+<!-- B. JavaScript-generated DOM                               -->
+
+<!-- ========================================================= -->
+
+<section>
+
+```
+<h2>B. JavaScript-generated DOM</h2>
+
+<div id="js-generated-container">
+    JS_CONTAINER_INITIAL_TEXT_20001
+</div>
+```
+
+</section>
+
+<!-- ========================================================= -->
+
+<!-- C. display:none                                           -->
+
+<!-- ========================================================= -->
+
+<section>
+
+```
+<h2>C. CSS display:none</h2>
+
+<p class="hidden-display">
+    CSS_DISPLAY_NONE_TEXT_30001
+</p>
+```
+
+</section>
+
+<!-- ========================================================= -->
+
+<!-- D. visibility:hidden                                      -->
+
+<!-- ========================================================= -->
+
+<section>
+
+```
+<h2>D. CSS visibility:hidden</h2>
+
+<p class="hidden-visibility">
+    CSS_VISIBILITY_HIDDEN_TEXT_40001
+</p>
+```
+
+</section>
+
+<!-- ========================================================= -->
+
+<!-- E. JavaScript-generated visible text after page load      -->
+
+<!-- ========================================================= -->
+
+<section>
+
+```
+<h2>E. JavaScript delayed DOM generation</h2>
+
+<div id="delayed-container">
+    DELAYED_CONTAINER_INITIAL_TEXT_50001
+</div>
+```
+
+</section>
+
+<!-- ========================================================= -->
+
+<!-- F. Canvas text                                            -->
+
+<!-- ========================================================= -->
+
+<section>
+
+```
+<h2>F. Canvas text</h2>
+
+<canvas id="test-canvas" width="600" height="100">
+    CANVAS_FALLBACK_HTML_TEXT_60001
+</canvas>
+```
+
+</section>
+
+<!-- ========================================================= -->
+
+<!-- G. iframe text                                            -->
+
+<!-- ========================================================= -->
+
+<section>
+
+```
+<h2>G. iframe text</h2>
+
+<iframe
+    srcdoc="
+        <!DOCTYPE html>
+        <html>
+        <body>
+            <h2>IFRAME_VISIBLE_TEXT_70001</h2>
+            <p>IFRAME_SECOND_TEXT_70002</p>
+        </body>
+        </html>
+    ">
+</iframe>
+```
+
+</section>
+
+<!-- ========================================================= -->
+
+<!-- H. Shadow DOM                                             -->
+
+<!-- ========================================================= -->
+
+<section>
+
+```
+<h2>H. Shadow DOM</h2>
+
+<div id="shadow-host"></div>
+```
+
+</section>
+
+<!-- ========================================================= -->
+
+<!-- I. CSS ::before generated content                         -->
+
+<!-- ========================================================= -->
+
+<section>
+
+```
+<h2>I. CSS pseudo-element</h2>
+
+<p id="pseudo-element-test">
+    PSEUDO_ELEMENT_NORMAL_TEXT_90001
+</p>
+```
+
+</section>
+
+<!-- ========================================================= -->
+
+<!-- J. JavaScript replacement of existing HTML                -->
+
+<!-- ========================================================= -->
+
+<section>
+
+```
+<h2>J. JavaScript replacement</h2>
+
+<div id="replacement-target">
+    ORIGINAL_HTML_TEXT_100001
+</div>
+```
+
+</section>
+
+<!-- ========================================================= -->
+
+<!-- K. JavaScript-created element with innerText              -->
+
+<!-- ========================================================= -->
+
+<section>
+
+```
+<h2>K. JavaScript-created element</h2>
+
+<div id="created-element-container"></div>
+```
+
+</section>
+
+<!-- ========================================================= -->
+
+<!-- L. JavaScript-created hidden element                      -->
+
+<!-- ========================================================= -->
+
+<section>
+
+```
+<h2>L. JavaScript-created hidden element</h2>
+
+<div id="hidden-created-container"></div>
+```
+
+</section>
+
+<!-- ========================================================= -->
+
+<!-- M. Off-screen text                                        -->
+
+<!-- ========================================================= -->
+
+<section>
+
+```
+<h2>M. Off-screen text</h2>
+
+<p class="offscreen">
+    OFFSCREEN_TEXT_130001
+</p>
+```
+
+</section>
+
+<!-- ========================================================= -->
+
+<!-- N. Very small text                                        -->
+
+<!-- ========================================================= -->
+
+<section>
+
+```
+<h2>N. Very small text</h2>
+
+<p class="small-text">
+    VERY_SMALL_TEXT_140001
+</p>
+```
+
+</section>
+
+<!-- ========================================================= -->
+
+<!-- O. JavaScript replacement after delay                      -->
+
+<!-- ========================================================= -->
+
+<section>
+
+```
+<h2>O. Delayed JavaScript replacement</h2>
+
+<div id="delayed-replacement">
+    DELAYED_ORIGINAL_HTML_TEXT_150001
+</div>
+```
+
+</section>
+
+<!-- ========================================================= -->
+
+<!-- P. document.write                                         -->
+
+<!-- ========================================================= -->
+
+<section>
+
+```
+<h2>P. JavaScript document.write</h2>
+
+<div id="document-write-container"></div>
+```
+
+</section>
+
+<!-- ========================================================= -->
+
+<!-- Q. innerHTML-generated HTML                               -->
+
+<!-- ========================================================= -->
+
+<section>
+
+```
+<h2>Q. JavaScript innerHTML</h2>
+
+<div id="innerhtml-container"></div>
+```
+
+</section>
+
+<!-- ========================================================= -->
+
+<!-- JavaScript                                               -->
+
+<!-- ========================================================= -->
+
+<script>
+
+    /*
+     * ---------------------------------------------------------
+     * B. JavaScript-generated DOM
+     * ---------------------------------------------------------
+     */
+
+    const jsContainer =
+        document.getElementById("js-generated-container");
+
+    const generatedElement =
+        document.createElement("p");
+
+    generatedElement.className = "generated";
+
+    generatedElement.textContent =
+        "JS_GENERATED_VISIBLE_TEXT_20002";
+
+    jsContainer.appendChild(generatedElement);
+
+
+    /*
+     * ---------------------------------------------------------
+     * F. Canvas
+     * ---------------------------------------------------------
+     */
+
+    const canvas =
+        document.getElementById("test-canvas");
+
+    const ctx =
+        canvas.getContext("2d");
+
+    ctx.font = "24px Arial";
+
+    ctx.fillStyle = "black";
+
+    ctx.fillText(
+        "CANVAS_RENDERED_TEXT_60002",
+        20,
+        50
+    );
+
+
+    /*
+     * ---------------------------------------------------------
+     * H. Shadow DOM
+     * ---------------------------------------------------------
+     */
+
+    const shadowHost =
+        document.getElementById("shadow-host");
+
+    const shadowRoot =
+        shadowHost.attachShadow({
+            mode: "open"
+        });
+
+    const shadowText =
+        document.createElement("p");
+
+    shadowText.textContent =
+        "SHADOW_DOM_VISIBLE_TEXT_80001";
+
+    shadowRoot.appendChild(shadowText);
+
+
+    /*
+     * ---------------------------------------------------------
+     * I. CSS pseudo-element
+     * ---------------------------------------------------------
+     */
+
+    const pseudoStyle =
+        document.createElement("style");
+
+    pseudoStyle.textContent = `
+        #pseudo-element-test::before {
+            content: "CSS_PSEUDO_ELEMENT_TEXT_90002";
+        }
+    `;
+
+    document.head.appendChild(pseudoStyle);
+
+
+    /*
+     * ---------------------------------------------------------
+     * J. Replace existing HTML text
+     * ---------------------------------------------------------
+     */
+
+    document.getElementById(
+        "replacement-target"
+    ).textContent =
+        "JS_REPLACED_TEXT_100002";
+
+
+    /*
+     * ---------------------------------------------------------
+     * K. JavaScript-created element
+     * ---------------------------------------------------------
+     */
+
+    const createdContainer =
+        document.getElementById(
+            "created-element-container"
+        );
+
+    const createdElement =
+        document.createElement("div");
+
+    createdElement.textContent =
+        "JS_CREATED_ELEMENT_TEXT_110001";
+
+    createdContainer.appendChild(
+        createdElement
+    );
+
+
+    /*
+     * ---------------------------------------------------------
+     * L. JavaScript-created hidden element
+     * ---------------------------------------------------------
+     */
+
+    const hiddenCreatedContainer =
+        document.getElementById(
+            "hidden-created-container"
+        );
+
+    const hiddenElement =
+        document.createElement("div");
+
+    hiddenElement.textContent =
+        "JS_CREATED_HIDDEN_TEXT_120001";
+
+    hiddenElement.style.display = "none";
+
+    hiddenCreatedContainer.appendChild(
+        hiddenElement
+    );
+
+
+    /*
+     * ---------------------------------------------------------
+     * P. document.write
+     * ---------------------------------------------------------
+     *
+     * document.write() is intentionally used here to create
+     * another JavaScript-generated text node.
+     */
+
+    document.getElementById(
+        "document-write-container"
+    ).innerHTML =
+        "<p>DOCUMENT_WRITE_GENERATED_TEXT_160001</p>";
+
+
+    /*
+     * ---------------------------------------------------------
+     * Q. innerHTML
+     * ---------------------------------------------------------
+     */
+
+    document.getElementById(
+        "innerhtml-container"
+    ).innerHTML =
+        "<p>INNERHTML_GENERATED_TEXT_170001</p>" +
+        "<p>INNERHTML_SECOND_TEXT_170002</p>";
+
+
+    /*
+     * ---------------------------------------------------------
+     * E. Delayed DOM generation
+     * ---------------------------------------------------------
+     */
+
+    setTimeout(function() {
+
+        const container =
+            document.getElementById(
+                "delayed-container"
+            );
+
+        const element =
+            document.createElement("p");
+
+        element.textContent =
+            "JS_DELAYED_GENERATED_TEXT_50002";
+
+        container.appendChild(element);
+
+    }, 1000);
+
+
+    /*
+     * ---------------------------------------------------------
+     * O. Delayed replacement
+     * ---------------------------------------------------------
+     *
+     * This is one of the most important tests.
+     */
+
+    setTimeout(function() {
+
+        document.getElementById(
+            "delayed-replacement"
+        ).textContent =
+            "JS_DELAYED_REPLACED_TEXT_150002";
+
+    }, 1500);
+
+
+    /*
+     * ---------------------------------------------------------
+     * Status change
+     * ---------------------------------------------------------
+     */
+
+    document.getElementById(
+        "status"
+    ).textContent =
+        "PAGE_STATUS_AFTER_JAVASCRIPT_00002";
+
+</script>
+
+<!-- ========================================================= -->
+
+<!-- Footer                                                    -->
+
+<!-- ========================================================= -->
+
+<hr>
+
+<p>
+    TEST_PAGE_END_STATIC_TEXT_999999
+</p>
+
+</body>
+</html>
