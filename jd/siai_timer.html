@@ -223,15 +223,6 @@ body{background:#0d0d1a;color:#fff;font-family:system-ui,-apple-system,sans-seri
         </div>
       </div>
     </div>
-    <div class="setting-section">
-      <div class="setting-section-title">🔔 終了音</div>
-      <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:6px">
-        <label style="font-size:12px;color:rgba(255,255,255,.6)">MP3ファイルを選択してください（時間切れ時に再生）</label>
-        <input type="file" id="sound-file-input" accept="audio/*" style="font-size:12px;color:#fff;width:100%"
-          onchange="handleSoundFile(this)">
-        <div id="sound-file-name" style="font-size:11px;color:rgba(255,215,0,.8)"></div>
-      </div>
-    </div>
     <div class="preview-box">
       <div class="preview-title">📋 設定プレビュー</div>
       <div class="preview-row"><span class="pl">試合時間：</span><span class="pv" id="prev-matchDur"></span></div>
@@ -245,8 +236,6 @@ body{background:#0d0d1a;color:#fff;font-family:system-ui,-apple-system,sans-seri
   </div>
 </div>
 
-<audio id="end-audio" preload="auto"></audio>
-
 <script>
 // ─── 状態 ───────────────────────────────────────────────────────────
 const S = {
@@ -257,8 +246,7 @@ const S = {
   remaining: 240,
   osaeSide: null, // null | 'aka' | 'shiro'
   osaeRunning: false,
-  history: [],
-  endSoundSrc: ''
+  history: []
 };
 
 let matchTimer = null;
@@ -324,6 +312,7 @@ function startMatch() {
   if (S.status === 'finished') return;
   if (S.status === 'idle') S.remaining = S.settings.matchDur;
   S.status = 'running';
+  playStartSound();
   startMatchTimer();
   render();
 }
@@ -451,21 +440,58 @@ function handleOsaeRelease(side) {
   render();
 }
 
-// ─── 終了音 ──────────────────────────────────────────────────────────
-function handleSoundFile(input) {
-  const file = input.files[0];
-  if (!file) return;
-  const url = URL.createObjectURL(file);
-  const audio = document.getElementById('end-audio');
-  audio.src = url;
-  S.endSoundSrc = url;
-  document.getElementById('sound-file-name').textContent = '✓ ' + file.name;
+// ─── 開始音・終了音（Web Audio APIで合成） ─────────────────────────────
+let actx = null;
+let masterGain = null;
+function getACtx() {
+  if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+  return actx;
 }
+// 出力段：ゲインを底上げしつつコンプレッサーで音割れを抑え、体感音量を最大限に大きくする
+function getMasterChain() {
+  const a = getACtx();
+  if (!masterGain) {
+    masterGain = a.createGain();
+    masterGain.gain.value = 3.0; // ブースト
+    const comp = a.createDynamicsCompressor();
+    comp.threshold.setValueAtTime(-16, a.currentTime);
+    comp.knee.setValueAtTime(14, a.currentTime);
+    comp.ratio.setValueAtTime(14, a.currentTime);
+    comp.attack.setValueAtTime(0.002, a.currentTime);
+    comp.release.setValueAtTime(0.15, a.currentTime);
+    masterGain.connect(comp);
+    comp.connect(a.destination);
+  }
+  return masterGain;
+}
+function schedTone(freq, startOffset, dur, vol = 1.0, type = 'square') {
+  try {
+    const a = getACtx();
+    const mg = getMasterChain();
+    const osc = a.createOscillator();
+    const osc2 = a.createOscillator();
+    const g = a.createGain();
+    const now = a.currentTime + startOffset;
+    osc.type = type; osc2.type = 'sine';
+    osc.frequency.value = freq;
+    osc2.frequency.value = freq * 1.5;
+    osc.connect(g); osc2.connect(g); g.connect(mg);
+    g.gain.setValueAtTime(vol, now);
+    g.gain.setValueAtTime(vol, now + dur - 0.03);
+    g.gain.linearRampToValueAtTime(0, now + dur);
+    osc.start(now); osc2.start(now);
+    osc.stop(now + dur); osc2.stop(now + dur);
+  } catch (e) {}
+}
+// 【開始音】880Hzで1.5秒の単音ピーーー
+function playStartSound() {
+  schedTone(880, 0, 1.5, 1.0);
+}
+// 【終了音】880Hzで0.1秒×4回→0.3秒休み を3グループ（総計約1.8秒）
 function playEndSound() {
-  const audio = document.getElementById('end-audio');
-  if (!audio.src || audio.src === window.location.href) return;
-  audio.currentTime = 0;
-  audio.play().catch(() => {});
+  for (let i = 0; i < 4; i++) schedTone(880, i * 0.1,       0.08, 1.0);
+  for (let i = 0; i < 4; i++) schedTone(880, 0.7 + i * 0.1, 0.08, 1.0);
+  for (let i = 0; i < 4; i++) schedTone(880, 1.4 + i * 0.1, 0.08, 1.0);
 }
 
 // ─── 設定 ────────────────────────────────────────────────────────────

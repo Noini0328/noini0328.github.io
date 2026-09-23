@@ -242,13 +242,33 @@ let currentTab   = 'timer';
 
 // ===== AUDIO =====
 let actx = null;
+let masterGain = null;
 function getACtx(){
   if(!actx) actx = new (window.AudioContext||window.webkitAudioContext)();
   return actx;
 }
+// 全音共通の出力段：ゲインを底上げしつつコンプレッサーで音割れを抑え、
+// 体感音量を最大限に大きくする
+function getMasterChain(){
+  const a = getACtx();
+  if(!masterGain){
+    masterGain = a.createGain();
+    masterGain.gain.value = 3.0; // ブースト
+    const comp = a.createDynamicsCompressor();
+    comp.threshold.setValueAtTime(-16, a.currentTime);
+    comp.knee.setValueAtTime(14, a.currentTime);
+    comp.ratio.setValueAtTime(14, a.currentTime);
+    comp.attack.setValueAtTime(0.002, a.currentTime);
+    comp.release.setValueAtTime(0.15, a.currentTime);
+    masterGain.connect(comp);
+    comp.connect(a.destination);
+  }
+  return masterGain;
+}
 function schedTone(freq, startOffset, dur, vol=1.0, type='square'){
   try{
     const a   = getACtx();
+    const mg  = getMasterChain();
     const osc = a.createOscillator();
     const osc2= a.createOscillator();
     const g   = a.createGain();
@@ -256,7 +276,7 @@ function schedTone(freq, startOffset, dur, vol=1.0, type='square'){
     osc.type  = type; osc2.type = 'sine';
     osc.frequency.value  = freq;
     osc2.frequency.value = freq * 1.5;
-    osc.connect(g); osc2.connect(g); g.connect(a.destination);
+    osc.connect(g); osc2.connect(g); g.connect(mg);
     g.gain.setValueAtTime(vol, now);
     g.gain.setValueAtTime(vol, now + dur - 0.03);
     g.gain.linearRampToValueAtTime(0, now + dur);
@@ -270,8 +290,8 @@ function beepKeikoStart(){
   schedTone(880, 0, 1.5, 1.0);
 }
 
-// 【終了】880Hzで0.1秒×4回→0.3秒休み を3グループ
-function beepFinish(){
+// 共通パターン：880Hzで0.1秒×4回→0.3秒休み を3グループ（総計約1.8秒）
+function beep880x4x3(){
   // group 1: 0.0, 0.1, 0.2, 0.3
   for(let i=0;i<4;i++) schedTone(880, i*0.1,        0.08, 1.0);
   // group 2: 0.7, 0.8, 0.9, 1.0  (0.4s後=0.3s休み)
@@ -280,11 +300,14 @@ function beepFinish(){
   for(let i=0;i<4;i++) schedTone(880, 1.4 + i*0.1,  0.08, 1.0);
 }
 
-// 【インターバル開始】3連打
+// 【終了】880Hzで0.1秒×4回→0.3秒休み を3グループ
+function beepFinish(){
+  beep880x4x3();
+}
+
+// 【インターバル開始】880Hzで0.1秒×4回→0.3秒休み を3グループ
 function beepIntervalStart(){
-  schedTone(660, 0,    0.12, 0.9);
-  schedTone(660, 0.18, 0.12, 0.9);
-  schedTone(660, 0.36, 0.12, 0.9);
+  beep880x4x3();
 }
 let toastTimer=null;
 function showToast(msg, color='#64B5F6'){
