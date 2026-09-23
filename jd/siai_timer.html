@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>柔道審判タイマー</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0d0d1a;color:#fff;font-family:system-ui,-apple-system,sans-serif;height:100dvh;display:flex;flex-direction:column;overflow:hidden;user-select:none}
+
+/* ヘッダー */
+#header{background:#16213e;padding:6px 10px;display:flex;align-items:center;gap:8px;flex-shrink:0;min-height:44px}
+#header .spacer{flex:1}
+#status-badge{padding:2px 7px;border-radius:5px;font-size:10px;font-weight:700;letter-spacing:1px;border:1px solid;white-space:nowrap}
+#timer-display{padding:3px 12px;border-radius:8px;font-size:28px;font-weight:900;letter-spacing:2px;border:1px solid;font-variant-numeric:tabular-nums;white-space:nowrap;transition:all .3s}
+#result-badge{padding:3px 8px;border-radius:7px;font-size:12px;font-weight:700;border:1px solid;display:flex;align-items:center;gap:3px;white-space:nowrap}
+#settings-btn{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);border-radius:7px;padding:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+#settings-btn svg{width:18px;height:18px;stroke:#888;fill:none;stroke-width:1.8}
+
+/* メインエリア */
+#main{flex:1;display:flex;overflow:hidden;min-height:0}
+.panel{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0;min-width:0}
+.panel.aka{background:#200a0c}
+.panel.shiro{background:#0e0e1e}
+.divider-v{width:1.5px;background:rgba(255,255,255,.12);flex-shrink:0}
+.divider-h{height:1.5px;background:rgba(255,255,255,.12);flex-shrink:0}
+
+/* パネルヘッダー */
+.panel-header{padding:4px;text-align:center;font-size:16px;font-weight:900;letter-spacing:6px;flex-shrink:0}
+.aka .panel-header{background:rgba(204,41,54,.18);color:#cc2936}
+.shiro .panel-header{background:rgba(204,204,204,.18);color:#ccc}
+
+/* スコアエリア */
+.scores{flex:1;display:flex;flex-direction:column;padding:3px 4px 2px;gap:2px;overflow:hidden;min-height:0}
+
+/* スコア行 */
+.score-row{flex:1;display:flex;align-items:center;background:rgba(255,255,255,.03);border-radius:7px;border:1px solid;overflow:hidden;min-height:0}
+.score-label{width:52px;padding-left:5px;display:flex;align-items:center;gap:2px;flex-shrink:0}
+.score-label .emoji{font-size:11px}
+.score-label .ltext{font-size:10px;font-weight:600;color:rgba(255,255,255,.6);white-space:nowrap}
+.score-center{flex:1;display:flex;align-items:center;justify-content:center;gap:6px}
+.score-num-wrap{width:40px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.score-num{font-weight:900;line-height:1;font-variant-numeric:tabular-nums}
+.score-badge{font-size:8px;font-weight:700;line-height:1.2;margin-top:1px}
+.round-btn{border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;border:1px solid;flex-shrink:0;background:rgba(255,255,255,.03);transition:opacity .15s}
+.round-btn:active{opacity:.7}
+.round-btn:disabled{opacity:.25;cursor:default;pointer-events:none}
+.round-btn svg{stroke-width:2;stroke:currentColor;fill:none}
+
+/* 抑え込みエリア */
+.osae-row{flex:2;background:rgba(255,255,255,.03);border-radius:7px;border:1px solid rgba(255,255,255,.24);display:flex;flex-direction:column;justify-content:center;padding:3px 5px;gap:2px;overflow:hidden;min-height:0}
+.osae-row.active{background:#0d2b0d;border-color:#4caf50;border-width:2px}
+.osae-header{display:flex;align-items:center;gap:3px}
+.osae-header .emoji{font-size:9px}
+.osae-header .ltext{font-size:10px;font-weight:600;color:rgba(255,255,255,.6)}
+.osae-header .maxsec{margin-left:auto;font-size:9px;color:rgba(255,255,255,.38)}
+.osae-controls{display:flex;align-items:center;gap:4px}
+.osae-btn{flex:1;border-radius:5px;border:1px solid;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:2px;padding:3px 2px;background:rgba(255,255,255,.03);transition:opacity .15s}
+.osae-btn:active{opacity:.7}
+.osae-btn:disabled{opacity:.25;cursor:default;pointer-events:none}
+.osae-btn .btn-icon{width:12px;height:12px;stroke-width:2;stroke:currentColor;fill:none;flex-shrink:0}
+.osae-btn .btn-label{font-size:9px;font-weight:700;white-space:nowrap}
+.osae-secs-wrap{width:44px;text-align:center;flex-shrink:0}
+.osae-secs{font-size:26px;font-weight:900;line-height:1;font-variant-numeric:tabular-nums}
+.osae-unit{font-size:9px;line-height:1.2}
+.osae-progress{height:4px;background:rgba(255,255,255,.12);border-radius:3px;overflow:hidden;margin:0 2px}
+.osae-bar{height:100%;border-radius:3px;transition:width .9s linear}
+
+/* 縦レイアウト時 */
+@media (orientation:portrait){
+  #main{flex-direction:column}
+  .divider-v{display:none}
+  .divider-h{display:block}
+}
+@media (orientation:landscape){
+  #main{flex-direction:row}
+  .divider-v{display:block}
+  .divider-h{display:none}
+}
+
+/* フッターコントロール */
+#footer{background:#16213e;padding:6px 8px;display:flex;align-items:center;justify-content:center;gap:6px;flex-shrink:0}
+.ctrl-btn{padding:7px 14px;border-radius:10px;border:1.5px solid;cursor:pointer;font-size:13px;font-weight:700;letter-spacing:.5px;background:rgba(255,255,255,.04);transition:opacity .15s;white-space:nowrap}
+.ctrl-btn:active{opacity:.7}
+.ctrl-btn:disabled{opacity:.25;cursor:default;pointer-events:none;border-color:rgba(255,255,255,.24);color:rgba(255,255,255,.24)}
+
+/* モーダル共通 */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:100;padding:12px}
+.modal-overlay.hidden{display:none}
+.modal{background:#16213e;border-radius:14px;border:1px solid rgba(255,255,255,.12);padding:20px;width:100%;max-width:380px;max-height:90dvh;overflow-y:auto}
+.modal h2{color:#fff;font-size:17px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+.modal-actions button{padding:7px 16px;border-radius:8px;border:none;cursor:pointer;font-size:14px;font-weight:700}
+.btn-cancel{background:rgba(255,255,255,.1);color:rgba(255,255,255,.7)}
+.btn-ok{color:#fff}
+
+/* 設定モーダル */
+.setting-section{background:#0f3460;border-radius:10px;border:1px solid rgba(255,255,255,.12);margin-bottom:12px;overflow:hidden}
+.setting-section-title{color:#ffd700;font-size:12px;font-weight:700;letter-spacing:1px;padding:8px 12px 4px}
+.setting-row{display:flex;align-items:center;padding:6px 12px}
+.setting-row label{flex:1;color:#fff;font-size:13px}
+.setting-row .val-ctrl{display:flex;align-items:center;gap:4px}
+.setting-row .val-display{width:64px;text-align:center;color:#fff;font-size:14px;font-weight:700}
+.setting-row .circ{width:30px;height:30px;border-radius:50%;border:1px solid;cursor:pointer;display:flex;align-items:center;justify-content:center;background:#0f3460}
+.setting-row .circ:disabled{opacity:.3;cursor:default}
+.setting-row .circ svg{width:14px;height:14px;stroke:currentColor;stroke-width:2;fill:none}
+.setting-divider{height:1px;background:rgba(255,255,255,.1);margin:0 12px}
+.switch-row{display:flex;align-items:center;padding:8px 12px}
+.switch-row label{flex:1;color:#fff;font-size:13px}
+.switch{width:40px;height:22px;border-radius:11px;border:none;cursor:pointer;position:relative;transition:background .2s;flex-shrink:0}
+.switch::after{content:'';position:absolute;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .2s}
+.switch.off{background:rgba(255,255,255,.2)}
+.switch.off::after{left:3px}
+.switch.on{background:#ffd700}
+.switch.on::after{left:21px}
+.preview-box{background:rgba(15,52,96,.4);border-radius:10px;border:1px solid rgba(255,215,0,.3);padding:12px}
+.preview-box .preview-title{color:#ffd700;font-size:12px;font-weight:700;margin-bottom:6px}
+.preview-row{display:flex;gap:4px;font-size:12px;margin-bottom:2px}
+.preview-row .pl{color:rgba(255,255,255,.6)}
+.preview-row .pv{color:#fff;font-weight:700}
+</style>
+</head>
+<body>
+
+<!-- ヘッダー -->
+<div id="header">
+  <button id="settings-btn" onclick="openSettings()" title="設定">
+    <svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+  </button>
+  <span id="status-badge">待機中</span>
+  <div class="spacer"></div>
+  <div id="timer-display">00:00</div>
+  <div class="spacer"></div>
+  <div id="result-badge">－</div>
+</div>
+
+<!-- メインエリア -->
+<div id="main">
+  <!-- 赤パネル -->
+  <div class="panel aka" id="panel-aka">
+    <div class="panel-header">赤</div>
+    <div class="scores" id="scores-aka"></div>
+  </div>
+  <div class="divider-v"></div>
+  <div class="divider-h"></div>
+  <!-- 白パネル -->
+  <div class="panel shiro" id="panel-shiro">
+    <div class="panel-header">白</div>
+    <div class="scores" id="scores-shiro"></div>
+  </div>
+</div>
+
+<!-- フッター -->
+<div id="footer">
+  <button class="ctrl-btn" id="btn-main" onclick="handleMainBtn()">▶ 開始</button>
+  <button class="ctrl-btn" id="btn-undo" onclick="handleUndo()" style="border-color:#7e57c2;color:#7e57c2" disabled>↩ 戻す</button>
+  <button class="ctrl-btn" onclick="confirmReset()" style="border-color:#ff5722;color:#ff5722">↺ リセット</button>
+</div>
+
+<!-- リセット確認モーダル -->
+<div class="modal-overlay hidden" id="reset-modal">
+  <div class="modal">
+    <h2>⚠️ リセット確認</h2>
+    <p style="color:rgba(255,255,255,.7);font-size:14px;line-height:1.6">試合データをすべてリセットしますか？<br>この操作は取り消せません。</p>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('reset-modal')">キャンセル</button>
+      <button class="btn-ok" style="background:#ff5722" onclick="doReset()">リセット</button>
+    </div>
+  </div>
+</div>
+
+<!-- 設定モーダル -->
+<div class="modal-overlay hidden" id="settings-modal">
+  <div class="modal">
+    <h2>⚙️ 設定</h2>
+    <div class="setting-section">
+      <div class="setting-section-title">⏱️ 試合時間</div>
+      <div class="setting-row">
+        <label>試合時間</label>
+        <div class="val-ctrl">
+          <button class="circ" style="border-color:#ffd700;color:#ffd700" onclick="adjSetting('matchDur',-30)">
+            <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+          <div class="val-display" id="disp-matchDur">4分</div>
+          <button class="circ" style="border-color:#ffd700;color:#ffd700" onclick="adjSetting('matchDur',30)">
+            <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="setting-section">
+      <div class="setting-section-title">🔒 抑え込み</div>
+      <div class="setting-row">
+        <label>最大秒数（一本）</label>
+        <div class="val-ctrl">
+          <button class="circ" style="border-color:#ffd700;color:#ffd700" onclick="adjSetting('osaeMax',-1)">
+            <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+          <div class="val-display" id="disp-osaeMax">20秒</div>
+          <button class="circ" style="border-color:#ffd700;color:#ffd700" onclick="adjSetting('osaeMax',1)">
+            <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="setting-section">
+      <div class="setting-section-title">🟡 指導</div>
+      <div class="switch-row">
+        <label>指導による勝敗判定</label>
+        <button class="switch on" id="switch-shido" onclick="toggleShido()"></button>
+      </div>
+      <div class="setting-divider"></div>
+      <div class="setting-row" id="shido-count-row">
+        <label>何回で負け</label>
+        <div class="val-ctrl">
+          <button class="circ" style="border-color:#ffd700;color:#ffd700" onclick="adjSetting('shidoLim',-1)">
+            <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+          <div class="val-display" id="disp-shidoLim">3回</div>
+          <button class="circ" style="border-color:#ffd700;color:#ffd700" onclick="adjSetting('shidoLim',1)">
+            <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="setting-section">
+      <div class="setting-section-title">🔔 終了音</div>
+      <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:6px">
+        <label style="font-size:12px;color:rgba(255,255,255,.6)">MP3ファイルを選択してください（時間切れ時に再生）</label>
+        <input type="file" id="sound-file-input" accept="audio/*" style="font-size:12px;color:#fff;width:100%"
+          onchange="handleSoundFile(this)">
+        <div id="sound-file-name" style="font-size:11px;color:rgba(255,215,0,.8)"></div>
+      </div>
+    </div>
+    <div class="preview-box">
+      <div class="preview-title">📋 設定プレビュー</div>
+      <div class="preview-row"><span class="pl">試合時間：</span><span class="pv" id="prev-matchDur"></span></div>
+      <div class="preview-row"><span class="pl">抑え込み一本：</span><span class="pv" id="prev-osaeMax"></span></div>
+      <div class="preview-row"><span class="pl">指導判定：</span><span class="pv" id="prev-shido"></span></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('settings-modal')">キャンセル</button>
+      <button class="btn-ok" style="background:#ffd700;color:#000" onclick="saveSettings()">保存</button>
+    </div>
+  </div>
+</div>
+
+<audio id="end-audio" preload="auto"></audio>
+
+<script>
+// ─── 状態 ───────────────────────────────────────────────────────────
+const S = {
+  settings: { matchDur: 240, osaeMax: 20, shidoEnabled: true, shidoLim: 3 },
+  aka: { ippon:0, wazaari:0, yuko:0, shido:0, osaeKomiSecs:0 },
+  shiro: { ippon:0, wazaari:0, yuko:0, shido:0, osaeKomiSecs:0 },
+  status: 'idle', // idle | running | paused | finished
+  remaining: 240,
+  osaeSide: null, // null | 'aka' | 'shiro'
+  osaeRunning: false,
+  history: [],
+  endSoundSrc: ''
+};
+
+let matchTimer = null;
+let osaeTimer = null;
+const MAX_HISTORY = 20;
+
+// ─── スナップショット ────────────────────────────────────────────────
+function snapshot() {
+  return {
+    aka: {...S.aka},
+    shiro: {...S.shiro},
+    status: S.status,
+    remaining: S.remaining,
+    osaeSide: S.osaeSide,
+    osaeRunning: S.osaeRunning
+  };
+}
+function pushHistory() {
+  S.history.push(snapshot());
+  if (S.history.length > MAX_HISTORY) S.history.shift();
+}
+
+// ─── 勝敗判定 ────────────────────────────────────────────────────────
+function getResult() {
+  const a = S.aka, w = S.shiro, cfg = S.settings;
+  if (a.ippon >= 1 && w.ippon < 1) return 'aka';
+  if (w.ippon >= 1 && a.ippon < 1) return 'shiro';
+  if (a.wazaari >= 2 && w.wazaari < 2) return 'aka';
+  if (w.wazaari >= 2 && a.wazaari < 2) return 'shiro';
+  if (cfg.shidoEnabled) {
+    if (a.shido >= cfg.shidoLim && w.shido < cfg.shidoLim) return 'shiro';
+    if (w.shido >= cfg.shidoLim && a.shido < cfg.shidoLim) return 'aka';
+  }
+  if (a.wazaari > w.wazaari) return 'aka';
+  if (w.wazaari > a.wazaari) return 'shiro';
+  if (a.yuko > w.yuko) return 'aka';
+  if (w.yuko > a.yuko) return 'shiro';
+  return 'draw';
+}
+function isDecided() {
+  const a = S.aka, w = S.shiro, cfg = S.settings;
+  if (a.ippon >= 1 || w.ippon >= 1) return true;
+  if (a.wazaari >= 2 || w.wazaari >= 2) return true;
+  if (cfg.shidoEnabled && (a.shido >= cfg.shidoLim || w.shido >= cfg.shidoLim)) return true;
+  return false;
+}
+
+// ─── タイマー ────────────────────────────────────────────────────────
+function startMatchTimer() {
+  clearInterval(matchTimer);
+  matchTimer = setInterval(() => {
+    if (S.remaining > 0) {
+      S.remaining--;
+      render();
+      if (isDecided()) finishMatch(false);
+    } else {
+      finishMatch(true);
+    }
+  }, 1000);
+}
+
+function startMatch() {
+  if (S.status === 'finished') return;
+  if (S.status === 'idle') S.remaining = S.settings.matchDur;
+  S.status = 'running';
+  startMatchTimer();
+  render();
+}
+
+function pauseMatch() {
+  clearInterval(matchTimer);
+  if (S.osaeRunning) { clearInterval(osaeTimer); S.osaeRunning = false; }
+  S.status = 'paused';
+  render();
+}
+
+function finishMatch(timeUp) {
+  clearInterval(matchTimer);
+  clearInterval(osaeTimer);
+  S.osaeRunning = false;
+  S.osaeSide = null;
+  S.status = 'finished';
+  if (timeUp) playEndSound();
+  render();
+}
+
+function handleMainBtn() {
+  if (S.status === 'idle' || S.status === 'paused') startMatch();
+  else if (S.status === 'running') pauseMatch();
+}
+
+// ─── アンドゥ ────────────────────────────────────────────────────────
+function handleUndo() {
+  if (!S.history.length) return;
+  clearInterval(matchTimer);
+  clearInterval(osaeTimer);
+  const snap = S.history.pop();
+  S.aka = {...snap.aka};
+  S.shiro = {...snap.shiro};
+  S.remaining = snap.remaining;
+  S.osaeSide = snap.osaeSide;
+
+  // finished → running として復元
+  const restoredStatus = snap.status === 'finished' ? 'running' : snap.status;
+  S.status = restoredStatus;
+
+  // 試合タイマー復元
+  if (restoredStatus === 'running') startMatchTimer();
+
+  // 抑え込みタイマー復元
+  if (snap.osaeRunning && snap.osaeSide) {
+    S.osaeRunning = true;
+    startOsaeTimer(snap.osaeSide);
+  } else {
+    S.osaeRunning = false;
+  }
+  render();
+}
+
+// ─── リセット ────────────────────────────────────────────────────────
+function confirmReset() { document.getElementById('reset-modal').classList.remove('hidden'); }
+function doReset() {
+  clearInterval(matchTimer); clearInterval(osaeTimer);
+  S.aka = {ippon:0,wazaari:0,yuko:0,shido:0,osaeKomiSecs:0};
+  S.shiro = {ippon:0,wazaari:0,yuko:0,shido:0,osaeKomiSecs:0};
+  S.status = 'idle';
+  S.remaining = S.settings.matchDur;
+  S.osaeSide = null; S.osaeRunning = false;
+  S.history = [];
+  closeModal('reset-modal');
+  render();
+}
+
+// ─── スコア変更 ───────────────────────────────────────────────────────
+function changeScore(side, field, delta) {
+  pushHistory();
+  const p = S[side];
+  const cfg = S.settings;
+  if (field === 'ippon')   p.ippon   = Math.max(0, Math.min(1, p.ippon + delta));
+  if (field === 'wazaari') p.wazaari = Math.max(0, Math.min(2, p.wazaari + delta));
+  if (field === 'yuko')    p.yuko    = Math.max(0, p.yuko + delta);
+  if (field === 'shido')   p.shido   = Math.max(0, Math.min(cfg.shidoLim, p.shido + delta));
+  if (isDecided() && S.status === 'running') finishMatch(false);
+  render();
+}
+
+// ─── 抑え込み ────────────────────────────────────────────────────────
+function startOsaeTimer(side) {
+  clearInterval(osaeTimer);
+  osaeTimer = setInterval(() => {
+    const p = S[side];
+    p.osaeKomiSecs++;
+    render();
+    if (p.osaeKomiSecs >= S.settings.osaeMax) {
+      clearInterval(osaeTimer);
+      S.osaeRunning = false;
+      S.osaeSide = null;
+      pushHistory();
+      S[side].ippon = Math.min(1, S[side].ippon + 1);
+      finishMatch(false);
+    }
+  }, 1000);
+}
+
+function handleOsaeStart(side) {
+  if (S.osaeRunning && S.osaeSide === side) {
+    // 一時停止
+    clearInterval(osaeTimer);
+    S.osaeRunning = false;
+    render();
+  } else {
+    // 開始（他サイドが動いていたらリセット）
+    if (S.osaeSide && S.osaeSide !== side) {
+      S[S.osaeSide].osaeKomiSecs = 0;
+    }
+    S.osaeSide = side;
+    S.osaeRunning = true;
+    if (S.status !== 'running') startMatch();
+    startOsaeTimer(side);
+    render();
+  }
+}
+
+function handleOsaeRelease(side) {
+  pushHistory();
+  clearInterval(osaeTimer);
+  S.osaeSide = null;
+  S.osaeRunning = false;
+  S[side].osaeKomiSecs = 0;
+  render();
+}
+
+// ─── 終了音 ──────────────────────────────────────────────────────────
+function handleSoundFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  const audio = document.getElementById('end-audio');
+  audio.src = url;
+  S.endSoundSrc = url;
+  document.getElementById('sound-file-name').textContent = '✓ ' + file.name;
+}
+function playEndSound() {
+  const audio = document.getElementById('end-audio');
+  if (!audio.src || audio.src === window.location.href) return;
+  audio.currentTime = 0;
+  audio.play().catch(() => {});
+}
+
+// ─── 設定 ────────────────────────────────────────────────────────────
+let tmpSettings = {};
+function openSettings() {
+  tmpSettings = {...S.settings};
+  updateSettingsUI();
+  document.getElementById('settings-modal').classList.remove('hidden');
+}
+function adjSetting(key, delta) {
+  if (key === 'matchDur')  tmpSettings.matchDur  = Math.max(60, Math.min(600, tmpSettings.matchDur + delta));
+  if (key === 'osaeMax')   tmpSettings.osaeMax   = Math.max(5, Math.min(60, tmpSettings.osaeMax + delta));
+  if (key === 'shidoLim')  tmpSettings.shidoLim  = Math.max(1, Math.min(5, tmpSettings.shidoLim + delta));
+  updateSettingsUI();
+}
+function toggleShido() {
+  tmpSettings.shidoEnabled = !tmpSettings.shidoEnabled;
+  updateSettingsUI();
+}
+function updateSettingsUI() {
+  const t = tmpSettings;
+  const m = t.matchDur;
+  document.getElementById('disp-matchDur').textContent =
+    m % 60 === 0 ? `${m/60}分` : `${Math.floor(m/60)}分${m%60}秒`;
+  document.getElementById('disp-osaeMax').textContent = t.osaeMax + '秒';
+  document.getElementById('disp-shidoLim').textContent = t.shidoLim + '回';
+  const sw = document.getElementById('switch-shido');
+  sw.className = 'switch ' + (t.shidoEnabled ? 'on' : 'off');
+  document.getElementById('shido-count-row').style.display = t.shidoEnabled ? '' : 'none';
+  document.getElementById('prev-matchDur').textContent =
+    m % 60 === 0 ? `${m/60}分` : `${Math.floor(m/60)}分${m%60}秒`;
+  document.getElementById('prev-osaeMax').textContent = t.osaeMax + '秒';
+  document.getElementById('prev-shido').textContent =
+    t.shidoEnabled ? `${t.shidoLim}回で負け` : '無効';
+}
+function saveSettings() {
+  S.settings = {...tmpSettings};
+  if (S.status === 'idle') S.remaining = S.settings.matchDur;
+  closeModal('settings-modal');
+  render();
+}
+function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+// ─── 描画 ────────────────────────────────────────────────────────────
+function fmtTime(s) {
+  return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+}
+
+function render() {
+  renderHeader();
+  renderPanel('aka');
+  renderPanel('shiro');
+  renderFooter();
+}
+
+function renderHeader() {
+  const timerEl = document.getElementById('timer-display');
+  const isLow = S.remaining <= 30 && S.status === 'running';
+  timerEl.textContent = fmtTime(S.remaining);
+  timerEl.style.color = isLow ? '#ff6b7a' : '#fff';
+  timerEl.style.borderColor = isLow ? '#cc2936' : 'rgba(255,255,255,.24)';
+  timerEl.style.background = isLow ? 'rgba(204,41,54,.15)' : 'rgba(255,255,255,.06)';
+  timerEl.style.borderWidth = isLow ? '2px' : '1px';
+
+  const badge = document.getElementById('status-badge');
+  const statusMap = {idle:['待機中','rgba(255,255,255,.38)'],running:['試合中','#4caf50'],paused:['停止中','#ffd700'],finished:['終　了','#ff5722']};
+  const [txt, clr] = statusMap[S.status];
+  badge.textContent = txt;
+  badge.style.color = clr;
+  badge.style.borderColor = clr + '80';
+  badge.style.background = clr + '20';
+
+  const res = getResult();
+  const rb = document.getElementById('result-badge');
+  const resMap = {aka:['赤 勝ち','#cc2936'],shiro:['白 勝ち','#ddd'],draw:['引き分け','#ffd700'],draw2:['引き分け','#ffd700']};
+  if (res === 'draw') {
+    rb.textContent = '引き分け';
+    rb.style.color = '#ffd700'; rb.style.borderColor = '#ffd70060'; rb.style.background = '#ffd70018';
+  } else if (res === 'aka' || res === 'shiro') {
+    const [t,c] = resMap[res];
+    rb.textContent = t;
+    rb.style.color = c; rb.style.borderColor = c+'60'; rb.style.background = c+'18';
+  } else {
+    rb.textContent = '－';
+    rb.style.color = 'rgba(255,255,255,.24)'; rb.style.borderColor = 'rgba(255,255,255,.24)'; rb.style.background = 'transparent';
+  }
+}
+
+function renderPanel(side) {
+  const isAka = side === 'aka';
+  const baseColor = isAka ? '#cc2936' : '#cccccc';
+  const p = S[side];
+  const cfg = S.settings;
+  const container = document.getElementById('scores-' + side);
+  const canEdit = S.status !== 'finished' || true; // 常に編集可（戻す想定）
+  const isRunning = S.status === 'running' || S.status === 'paused' || S.status === 'idle';
+
+  // スコア行の定義
+  const rows = [
+    {
+      key: 'ippon', emoji: '🥇', label: '一本',
+      val: p.ippon, color: p.ippon >= 1 ? '#ff6b35' : baseColor,
+      canAdd: isRunning && p.ippon < 1,
+      canSub: isRunning && p.ippon > 0,
+      badge: p.ippon >= 1 ? '上限' : null,
+      badgeColor: '#ff6b35'
+    },
+    {
+      key: 'wazaari', emoji: '🥈', label: '技あり',
+      val: p.wazaari, color: p.wazaari >= 2 ? '#2196f3' : baseColor,
+      canAdd: isRunning && p.wazaari < 2,
+      canSub: isRunning && p.wazaari > 0,
+      badge: p.wazaari >= 2 ? '一本相当' : '/2',
+      badgeColor: p.wazaari >= 2 ? '#2196f3' : 'rgba(255,255,255,.38)'
+    },
+    {
+      key: 'yuko', emoji: '🏅', label: '有効',
+      val: p.yuko, color: baseColor,
+      canAdd: isRunning,
+      canSub: isRunning && p.yuko > 0,
+      badge: null
+    },
+    {
+      key: 'shido', emoji: '🟡', label: '指導',
+      val: p.shido, color: '#ffd700',
+      canAdd: isRunning && p.shido < cfg.shidoLim,
+      canSub: isRunning && p.shido > 0,
+      badge: p.shido >= cfg.shidoLim ? '負け' : `/${cfg.shidoLim}`,
+      badgeColor: p.shido >= cfg.shidoLim ? '#f44336' : 'rgba(255,255,255,.38)'
+    }
+  ];
+
+  // 抑え込み
+  const isMyOsae = S.osaeSide === side;
+  const osaeActive = isMyOsae;
+  const osaeIsRunning = isMyOsae && S.osaeRunning;
+  const secs = p.osaeKomiSecs;
+  const maxSecs = cfg.osaeMax;
+  const prog = maxSecs > 0 ? Math.min(1, secs / maxSecs) : 0;
+  const barColor = prog < 0.5 ? '#4caf50' : prog < 0.8 ? '#ffd700' : '#ff5722';
+
+  // ─── DOM構築（差分更新のため毎回再生成は避けてinnerHTMLで）───
+  // (パフォーマンス上問題ない規模なのでinnerHTMLで生成)
+  let html = '';
+
+  for (const r of rows) {
+    const c = r.color;
+    const addDisabled = r.canAdd ? '' : 'disabled';
+    const subDisabled = r.canSub ? '' : 'disabled';
+    html += `<div class="score-row" style="border-color:${c}30">
+      <div class="score-label">
+        <span class="emoji">${r.emoji}</span>
+        <span class="ltext">${r.label}</span>
+      </div>
+      <div class="score-center">
+        <button class="round-btn" style="width:28px;height:28px;border-color:${subDisabled?'rgba(255,255,255,.12)':c+'60'};color:${subDisabled?'rgba(255,255,255,.24)':c}"
+          onclick="changeScore('${side}','${r.key}',-1)" ${subDisabled}>
+          <svg width="12" height="12" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+        <div class="score-num-wrap">
+          <div class="score-num" style="color:${c}">${r.val}</div>
+          ${r.badge ? `<div class="score-badge" style="color:${r.badgeColor}">${r.badge}</div>` : ''}
+        </div>
+        <button class="round-btn" style="width:28px;height:28px;border-color:${addDisabled?'rgba(255,255,255,.12)':c+'60'};color:${addDisabled?'rgba(255,255,255,.24)':c}"
+          onclick="changeScore('${side}','${r.key}',1)" ${addDisabled}>
+          <svg width="12" height="12" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+      </div>
+    </div>`;
+  }
+
+  // 抑え込み行
+  const startEnabled = !osaeIsRunning && isRunning && (!S.osaeSide || S.osaeSide === side);
+  const pauseEnabled = osaeIsRunning;
+  const releaseEnabled = osaeActive;
+  const startPauseDisabled = (osaeIsRunning ? !pauseEnabled : !startEnabled) ? 'disabled' : '';
+  const releaseDisabled = releaseEnabled ? '' : 'disabled';
+  const icon = osaeIsRunning
+    ? `<svg class="btn-icon" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`
+    : `<svg class="btn-icon" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+  const btnLabel = osaeIsRunning ? '一時停止' : '開始';
+  const startBtnColor = osaeIsRunning ? '#ffd700' : '#4caf50';
+  const secsColor = osaeActive ? barColor : 'rgba(255,255,255,.38)';
+
+  html += `<div class="osae-row${osaeActive?' active':''}">
+    <div class="osae-header">
+      <span class="emoji">🔒</span>
+      <span class="ltext">抑え込み</span>
+      <span class="maxsec">最大${maxSecs}秒</span>
+    </div>
+    <div class="osae-controls">
+      <button class="osae-btn" style="border-color:${startPauseDisabled?'rgba(255,255,255,.24)':startBtnColor};color:${startPauseDisabled?'rgba(255,255,255,.24)':startBtnColor}"
+        onclick="handleOsaeStart('${side}')" ${startPauseDisabled}>
+        ${icon}<span class="btn-label">${btnLabel}</span>
+      </button>
+      <div class="osae-secs-wrap">
+        <div class="osae-secs" style="color:${secsColor}">${secs}</div>
+        <div class="osae-unit" style="color:${secsColor}">秒</div>
+      </div>
+      <button class="osae-btn" style="border-color:${releaseDisabled?'rgba(255,255,255,.24)':'#ff5722'};color:${releaseDisabled?'rgba(255,255,255,.24)':'#ff5722'}"
+        onclick="handleOsaeRelease('${side}')" ${releaseDisabled}>
+        <svg class="btn-icon" viewBox="0 0 24 24"><rect x="3" y="11" width="11" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
+        <span class="btn-label">解けた</span>
+      </button>
+    </div>
+    ${osaeActive ? `<div class="osae-progress"><div class="osae-bar" style="width:${(prog*100).toFixed(1)}%;background:${barColor}"></div></div>` : ''}
+  </div>`;
+
+  container.innerHTML = html;
+  adaptScoreSizes(container);
+}
+
+function adaptScoreSizes(container) {
+  // 各行の実際の高さに応じてフォントサイズを動的調整
+  const rows = container.querySelectorAll('.score-row');
+  rows.forEach(row => {
+    const h = row.offsetHeight;
+    if (!h) return;
+    const numEl = row.querySelector('.score-num');
+    const btnEls = row.querySelectorAll('.round-btn');
+    const sz = Math.max(14, Math.min(26, h * 0.48));
+    const bsz = Math.max(22, Math.min(34, h * 0.62));
+    if (numEl) numEl.style.fontSize = sz + 'px';
+    btnEls.forEach(b => {
+      b.style.width = bsz + 'px';
+      b.style.height = bsz + 'px';
+    });
+  });
+}
+
+function renderFooter() {
+  const btn = document.getElementById('btn-main');
+  const undoBtn = document.getElementById('btn-undo');
+  if (S.status === 'idle') {
+    btn.textContent = '▶ 開始'; btn.disabled = false;
+    btn.style.borderColor = '#4caf50'; btn.style.color = '#4caf50';
+  } else if (S.status === 'running') {
+    btn.textContent = '⏸ 一時停止'; btn.disabled = false;
+    btn.style.borderColor = '#ffd700'; btn.style.color = '#ffd700';
+  } else if (S.status === 'paused') {
+    btn.textContent = '▶ 再開'; btn.disabled = false;
+    btn.style.borderColor = '#4caf50'; btn.style.color = '#4caf50';
+  } else {
+    btn.textContent = '▶ 開始'; btn.disabled = true;
+    btn.style.borderColor = ''; btn.style.color = '';
+  }
+  undoBtn.disabled = S.history.length === 0;
+}
+
+// ─── 初期化 ──────────────────────────────────────────────────────────
+window.addEventListener('resize', () => {
+  render();
+});
+S.remaining = S.settings.matchDur;
+render();
+</script>
+</body>
+</html>

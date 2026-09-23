@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>稽古タイマー</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0D0F14;color:#fff;min-height:100vh;user-select:none;-webkit-user-select:none}
+
+#app{display:flex;flex-direction:column;min-height:100vh;max-width:480px;margin:0 auto}
+
+/* Header */
+#header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px 8px;gap:12px}
+.title-block{min-width:0;flex:1}
+.title-block h1{font-size:20px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.title-block p{font-size:10px;color:rgba(255,255,255,0.3);letter-spacing:2px;margin-top:1px}
+#tab-bar{display:flex;gap:2px;background:rgba(255,255,255,0.07);border-radius:24px;padding:3px;flex-shrink:0}
+.tab-btn{display:flex;align-items:center;gap:4px;padding:7px 12px;border:none;background:transparent;color:rgba(255,255,255,0.38);font-size:12px;border-radius:20px;cursor:pointer;transition:all .2s;white-space:nowrap;font-family:inherit}
+.tab-btn.active{background:rgba(100,181,246,0.2);color:#64B5F6;font-weight:600}
+
+#content{flex:1;overflow-y:auto}
+
+/* ===== IDLE ===== */
+#screen-idle{padding:24px 20px}
+.summary-card{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:20px}
+.summary-row{display:flex;align-items:center;gap:10px;padding:7px 0}
+.summary-row+.summary-row{border-top:1px solid rgba(255,255,255,0.06)}
+.summary-icon{font-size:17px;color:rgba(255,255,255,0.38);width:22px;text-align:center}
+.summary-label{color:rgba(255,255,255,0.45);font-size:14px;flex:1}
+.summary-val{font-size:15px;font-weight:600}
+.start-wrap{display:flex;justify-content:center;margin-top:44px}
+#btn-start{width:136px;height:136px;border-radius:50%;background:linear-gradient(135deg,#64B5F6,#1565C0);border:none;color:#fff;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;box-shadow:0 0 40px rgba(100,181,246,0.35);transition:transform .15s,box-shadow .15s;font-family:inherit}
+#btn-start:hover{transform:scale(1.04);box-shadow:0 0 56px rgba(100,181,246,0.5)}
+#btn-start:active{transform:scale(0.96)}
+#btn-start .play-icon{font-size:46px;line-height:1}
+#btn-start .play-label{font-size:12px;font-weight:600;letter-spacing:1px}
+
+/* ===== RUNNING ===== */
+#screen-running{padding:16px 20px 24px;display:flex;flex-direction:column;align-items:center}
+.round-info{text-align:center;margin-bottom:20px}
+.round-ratio{color:rgba(255,255,255,0.38);font-size:16px;font-weight:300}
+.round-main{font-size:30px;font-weight:700;margin-top:4px}
+.ring-wrap{position:relative;width:210px;height:210px;margin-bottom:10px}
+#progress-canvas{position:absolute;top:0;left:0}
+.ring-inner{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.time-display{font-size:48px;font-weight:200;letter-spacing:3px;font-variant-numeric:tabular-nums}
+.time-label{font-size:12px;color:rgba(255,255,255,0.4);letter-spacing:2px;margin-top:2px}
+
+/* phase badge */
+.phase-badge{padding:5px 18px;border-radius:20px;font-size:13px;font-weight:600;letter-spacing:1px;margin-bottom:18px;min-height:30px;transition:all .3s}
+.phase-keiko{background:rgba(100,181,246,0.15);color:#64B5F6;border:1px solid rgba(100,181,246,0.35)}
+.phase-interval{background:rgba(255,183,77,0.15);color:#FFB74D;border:1px solid rgba(255,183,77,0.35)}
+.phase-waiting{background:rgba(255,183,77,0.2);color:#FFB74D;border:1px solid rgba(255,183,77,0.6);animation:pulse-border 1.2s ease-in-out infinite}
+@keyframes pulse-border{0%,100%{box-shadow:0 0 0 0 rgba(255,183,77,0.4)}50%{box-shadow:0 0 0 8px rgba(255,183,77,0)}}
+
+/* tap-to-start overlay (manual interval) */
+#tap-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:10;border-radius:50%;background:rgba(255,183,77,0.08)}
+#tap-overlay-label{text-align:center;pointer-events:none}
+#tap-overlay-label .tap-icon{font-size:36px;animation:bounce .9s ease-in-out infinite}
+#tap-overlay-label .tap-text{font-size:12px;color:#FFB74D;font-weight:700;letter-spacing:1px;margin-top:4px}
+@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+
+.controls{display:flex;gap:24px}
+.ctrl-btn{display:flex;flex-direction:column;align-items:center;gap:8px;background:none;border:none;cursor:pointer;font-family:inherit}
+.ctrl-circle{width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:28px;transition:transform .15s;border:1.5px solid}
+.ctrl-btn:active .ctrl-circle{transform:scale(0.93)}
+.ctrl-pause .ctrl-circle{background:rgba(100,181,246,0.15);border-color:rgba(100,181,246,0.5);color:#64B5F6}
+.ctrl-pause span{color:#64B5F6;font-size:12px;letter-spacing:1px}
+.ctrl-stop .ctrl-circle{background:rgba(239,83,80,0.15);border-color:rgba(239,83,80,0.5);color:#EF5350}
+.ctrl-stop span{color:#EF5350;font-size:12px;letter-spacing:1px}
+
+/* ===== SETTINGS ===== */
+#screen-settings{padding:8px 0 40px}
+.section-label{padding:10px 20px 6px;font-size:11px;color:rgba(255,255,255,0.45);letter-spacing:2px;font-weight:600}
+.time-setting-card{margin:0 16px 8px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.11);border-radius:16px;padding:14px 18px}
+.time-setting-title{font-size:13px;font-weight:600;margin-bottom:14px;letter-spacing:.5px}
+.time-setting-title.keiko-title{color:#64B5F6}
+.time-setting-title.interval-title{color:#FFB74D}
+
+/* ── ドラムロールピッカー ── */
+.drum-row{display:flex;align-items:flex-start;justify-content:center;gap:8px}
+.picker-col{display:flex;flex-direction:column;align-items:center;gap:4px}
+.picker-col label{font-size:11px;color:rgba(255,255,255,0.5);letter-spacing:1px}
+.picker-drum{height:132px;width:80px;overflow-y:scroll;scroll-snap-type:y mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;border-radius:10px;background:rgba(255,255,255,0.06);position:relative}
+.picker-drum::-webkit-scrollbar{display:none}
+/* fade top/bottom */
+.drum-wrap{position:relative;width:80px}
+.drum-wrap::before,.drum-wrap::after{content:'';position:absolute;left:0;right:0;height:40px;z-index:2;pointer-events:none}
+.drum-wrap::before{top:0;background:linear-gradient(to bottom,#111318 20%,transparent)}
+.drum-wrap::after{bottom:0;background:linear-gradient(to top,#111318 20%,transparent)}
+.drum-sel{position:absolute;left:4px;right:4px;top:50%;transform:translateY(-50%);height:42px;background:rgba(255,255,255,0.08);border-radius:8px;pointer-events:none;z-index:1}
+.drum-item{height:44px;display:flex;align-items:center;justify-content:center;scroll-snap-align:center;font-size:26px;font-weight:600;color:rgba(255,255,255,0.22);transition:color .1s;font-variant-numeric:tabular-nums}
+.drum-item.center{color:#fff}
+.colon-sep{font-size:28px;font-weight:700;color:rgba(255,255,255,0.45);padding-top:28px}
+
+/* Manual interval toggle */
+.interval-mode-card{margin:0 16px 8px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.11);border-radius:16px;padding:14px 18px}
+.toggle-row{display:flex;align-items:center;justify-content:space-between}
+.toggle-desc{font-size:13px;font-weight:500;color:rgba(255,255,255,0.8)}
+.toggle-sub{font-size:11px;color:rgba(255,255,255,0.38);margin-top:3px}
+/* iOS-style toggle */
+.toggle-switch{position:relative;width:52px;height:30px;flex-shrink:0}
+.toggle-switch input{opacity:0;width:0;height:0}
+.toggle-slider{position:absolute;inset:0;background:rgba(255,255,255,0.15);border-radius:30px;cursor:pointer;transition:background .25s}
+.toggle-slider:before{content:'';position:absolute;width:24px;height:24px;left:3px;top:3px;background:#fff;border-radius:50%;transition:transform .25s;box-shadow:0 1px 4px rgba(0,0,0,0.4)}
+.toggle-switch input:checked+.toggle-slider{background:#FFB74D}
+.toggle-switch input:checked+.toggle-slider:before{transform:translateX(22px)}
+.manual-time-note{font-size:11px;color:rgba(255,183,77,0.7);margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.08)}
+
+/* Round picker */
+.round-picker-wrap{margin:0 16px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:16px;height:112px;overflow:hidden;position:relative}
+.round-picker-wrap::before,.round-picker-wrap::after{content:'';position:absolute;left:0;right:0;height:34px;z-index:2;pointer-events:none}
+.round-picker-wrap::before{top:0;background:linear-gradient(to bottom,#111318 30%,transparent)}
+.round-picker-wrap::after{bottom:0;background:linear-gradient(to top,#111318 30%,transparent)}
+.selection-line{position:absolute;left:12px;right:12px;top:50%;transform:translateY(-50%);height:38px;background:rgba(100,181,246,0.1);border-radius:8px;pointer-events:none;z-index:1}
+#round-list{height:100%;overflow-y:scroll;scroll-snap-type:y mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:37px 0}
+#round-list::-webkit-scrollbar{display:none}
+.round-item{height:38px;display:flex;align-items:center;justify-content:center;scroll-snap-align:center;font-size:19px;font-weight:600;color:rgba(255,255,255,0.35);cursor:pointer;transition:color .1s}
+.round-item.selected{color:#64B5F6}
+
+/* Toast */
+#toast{position:fixed;top:68px;left:50%;transform:translateX(-50%) translateY(-6px);background:#1A1D25;border-radius:30px;padding:10px 24px;font-size:15px;font-weight:700;letter-spacing:1px;opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;white-space:nowrap;z-index:999;border-width:1.5px;border-style:solid}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="header">
+    <div class="title-block">
+      <h1>稽古タイマー</h1>
+      <p>KEIKO TIMER</p>
+    </div>
+    <div id="tab-bar">
+      <button class="tab-btn active" id="tab-timer" onclick="showTab('timer')">⏱ タイマー</button>
+      <button class="tab-btn" id="tab-settings" onclick="showTab('settings')">⚙ 設定</button>
+    </div>
+  </div>
+
+  <div id="content">
+    <!-- IDLE -->
+    <div id="screen-idle">
+      <div class="summary-card">
+        <div class="summary-row"><span class="summary-icon">🔁</span><span class="summary-label">本数</span><span class="summary-val" id="sum-rounds">∞ 無限</span></div>
+        <div class="summary-row"><span class="summary-icon">🥋</span><span class="summary-label">稽古時間</span><span class="summary-val" id="sum-keiko">00:30</span></div>
+        <div class="summary-row"><span class="summary-icon">💤</span><span class="summary-label">インターバル</span><span class="summary-val" id="sum-interval">00:10</span></div>
+      </div>
+      <div class="start-wrap">
+        <button id="btn-start" onclick="startTimer()">
+          <div class="play-icon">▶</div>
+          <div class="play-label">スタート</div>
+        </button>
+      </div>
+    </div>
+
+    <!-- RUNNING -->
+    <div id="screen-running" style="display:none">
+      <div class="round-info">
+        <div class="round-ratio" id="round-ratio">∞</div>
+        <div class="round-main" id="round-main">1 本目</div>
+      </div>
+      <div class="ring-wrap" id="ring-wrap">
+        <canvas id="progress-canvas" width="210" height="210"></canvas>
+        <div class="ring-inner">
+          <div class="time-display" id="time-display">00:30</div>
+          <div class="time-label" id="time-label">残り時間</div>
+        </div>
+        <!-- tap overlay for manual interval (hidden by default) -->
+        <div id="tap-overlay" style="display:none" onclick="manualNext()">
+          <div id="tap-overlay-label">
+            <div class="tap-icon">👆</div>
+            <div class="tap-text">タップして開始</div>
+          </div>
+        </div>
+      </div>
+      <div class="phase-badge phase-keiko" id="phase-badge">🥋 稽古中</div>
+      <div class="controls">
+        <button class="ctrl-btn ctrl-pause" id="btn-pause" onclick="togglePause()">
+          <div class="ctrl-circle" id="pause-icon">⏸</div>
+          <span id="pause-label">一時停止</span>
+        </button>
+        <button class="ctrl-btn ctrl-stop" onclick="stopTimer()">
+          <div class="ctrl-circle">⏹</div>
+          <span>停止</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div id="screen-settings" style="display:none">
+      <div class="section-label">本数設定</div>
+      <div class="round-picker-wrap">
+        <div class="selection-line"></div>
+        <div id="round-list"></div>
+      </div>
+
+      <div class="section-label" style="margin-top:14px">稽古時間</div>
+      <div class="time-setting-card">
+        <div class="time-setting-title keiko-title">🥋 稽古時間</div>
+        <div class="drum-row" id="spinner-keiko"></div>
+      </div>
+
+      <div class="section-label">インターバル</div>
+      <!-- Manual mode toggle -->
+      <div class="interval-mode-card">
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-desc">👆 手動モード</div>
+            <div class="toggle-sub">稽古終了後にタップで次の稽古を開始</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="manual-toggle" onchange="onManualToggle()">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="manual-time-note" id="manual-note" style="display:none">
+          手動モード中はインターバル時間の設定は使用されません
+        </div>
+      </div>
+      <div class="time-setting-card" id="interval-time-card">
+        <div class="time-setting-title interval-title">💤 インターバル時間</div>
+        <div class="drum-row" id="spinner-interval"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+// ===== STATE =====
+let repeatCount  = null;   // null=無限
+let keikoMin     = 3,  keikoSec  = 0;
+let intervalMin  = 1,  intervalSec = 0;
+let manualInterval = false;
+
+let timerState   = 'idle'; // idle|running|paused|waiting
+let currentRound = 1;
+let phase        = 'keiko'; // 'keiko'|'interval'
+let remainingSec = 0;
+let ticker       = null;
+let currentTab   = 'timer';
+
+// ===== AUDIO =====
+let actx = null;
+function getACtx(){
+  if(!actx) actx = new (window.AudioContext||window.webkitAudioContext)();
+  return actx;
+}
+function schedTone(freq, startOffset, dur, vol=1.0, type='square'){
+  try{
+    const a   = getACtx();
+    const osc = a.createOscillator();
+    const osc2= a.createOscillator();
+    const g   = a.createGain();
+    const now = a.currentTime + startOffset;
+    osc.type  = type; osc2.type = 'sine';
+    osc.frequency.value  = freq;
+    osc2.frequency.value = freq * 1.5;
+    osc.connect(g); osc2.connect(g); g.connect(a.destination);
+    g.gain.setValueAtTime(vol, now);
+    g.gain.setValueAtTime(vol, now + dur - 0.03);
+    g.gain.linearRampToValueAtTime(0, now + dur);
+    osc.start(now); osc2.start(now);
+    osc.stop(now + dur); osc2.stop(now + dur);
+  }catch(e){}
+}
+
+// 【稽古開始】同じ高さで1.5秒のピーーー
+function beepKeikoStart(){
+  schedTone(880, 0, 1.5, 1.0);
+}
+
+// 【終了】880Hzで0.1秒×4回→0.3秒休み を3グループ
+function beepFinish(){
+  // group 1: 0.0, 0.1, 0.2, 0.3
+  for(let i=0;i<4;i++) schedTone(880, i*0.1,        0.08, 1.0);
+  // group 2: 0.7, 0.8, 0.9, 1.0  (0.4s後=0.3s休み)
+  for(let i=0;i<4;i++) schedTone(880, 0.7 + i*0.1,  0.08, 1.0);
+  // group 3: 1.4, 1.5, 1.6, 1.7
+  for(let i=0;i<4;i++) schedTone(880, 1.4 + i*0.1,  0.08, 1.0);
+}
+
+// 【インターバル開始】3連打
+function beepIntervalStart(){
+  schedTone(660, 0,    0.12, 0.9);
+  schedTone(660, 0.18, 0.12, 0.9);
+  schedTone(660, 0.36, 0.12, 0.9);
+}
+let toastTimer=null;
+function showToast(msg, color='#64B5F6'){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.style.color=color;
+  t.style.borderColor=color+'80'; t.style.boxShadow=`0 0 20px ${color}40`;
+  if(toastTimer) clearTimeout(toastTimer);
+  t.classList.remove('show');
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    t.classList.add('show');
+    toastTimer=setTimeout(()=>t.classList.remove('show'),2200);
+  }));
+}
+
+// ===== TABS =====
+function showTab(tab){
+  currentTab=tab;
+  ['timer','settings'].forEach(t=>document.getElementById('tab-'+t).classList.toggle('active',t===tab));
+  const running=(timerState==='running'||timerState==='paused'||timerState==='waiting');
+  document.getElementById('screen-idle').style.display    =(tab==='timer'&&!running)?'block':'none';
+  document.getElementById('screen-running').style.display =(tab==='timer'&&running) ?'flex' :'none';
+  document.getElementById('screen-settings').style.display=(tab==='settings')       ?'block':'none';
+  if(tab==='settings') renderSettings();
+  else updateIdleSummary();
+}
+function refreshView(){
+  const running=(timerState==='running'||timerState==='paused'||timerState==='waiting');
+  if(currentTab==='timer'){
+    document.getElementById('screen-idle').style.display    =running?'none':'block';
+    document.getElementById('screen-running').style.display =running?'flex':'none';
+    if(!running) updateIdleSummary();
+  }
+}
+
+// ===== IDLE SUMMARY =====
+function fmt2(s){const m=Math.floor(s/60),sc=s%60;return`${String(m).padStart(2,'0')}:${String(sc).padStart(2,'0')}`;}
+function updateIdleSummary(){
+  document.getElementById('sum-rounds').textContent  =repeatCount===null?'∞ 無限':`${repeatCount} 本`;
+  document.getElementById('sum-keiko').textContent   =fmt2(keikoMin*60+keikoSec);
+  document.getElementById('sum-interval').textContent=manualInterval?'手動':fmt2(intervalMin*60+intervalSec);
+}
+
+// ===== TIMER CORE =====
+function startTimer(){
+  if(timerState==='paused'){resumeTimer();return;}
+  currentRound=1; phase='keiko';
+  remainingSec=keikoMin*60+keikoSec;
+  timerState='running';
+  beepKeikoStart();
+  showToast(`1 本目　稽古開始！`,'#64B5F6');
+  refreshView(); startTick(); updateRunUI();
+}
+function resumeTimer(){
+  if(timerState!=='paused') return;
+  timerState='running';
+  document.getElementById('pause-icon').textContent='⏸';
+  document.getElementById('pause-label').textContent='一時停止';
+  startTick();
+}
+function togglePause(){
+  if(timerState==='running'){
+    timerState='paused'; clearInterval(ticker); ticker=null;
+    document.getElementById('pause-icon').textContent='▶';
+    document.getElementById('pause-label').textContent='再開';
+  } else if(timerState==='paused'){
+    resumeTimer();
+  }
+  // waiting state: pause button disabled (do nothing)
+}
+function stopTimer(){
+  clearInterval(ticker); ticker=null; timerState='idle';
+  refreshView();
+}
+function startTick(){clearInterval(ticker);ticker=setInterval(tick,1000);}
+function tick(){
+  if(remainingSec>0){remainingSec--;updateRunUI();}
+  else{onPhaseComplete();}
+}
+
+function onPhaseComplete(){
+  if(phase==='keiko'){
+    // 稽古終了
+    if(manualInterval){
+      // 手動モード → waiting
+      clearInterval(ticker); ticker=null;
+      timerState='waiting';
+      beepIntervalStart();
+      showToast('インターバル（タップで次へ）','#FFB74D');
+      updateRunUI();
+    } else {
+      const iSec=intervalMin*60+intervalSec;
+      if(iSec>0){
+        phase='interval'; remainingSec=iSec;
+        beepIntervalStart();
+        showToast('インターバル','#FFB74D');
+        updateRunUI();
+      } else {
+        nextRound();
+      }
+    }
+  } else {
+    nextRound();
+  }
+}
+
+// 手動タップで次の稽古へ
+function manualNext(){
+  if(timerState!=='waiting') return;
+  nextRound();
+}
+
+function nextRound(){
+  const next=currentRound+1;
+  if(repeatCount!==null&&next>repeatCount){
+    clearInterval(ticker); ticker=null; timerState='finished';
+    beepFinish();
+    showToast('終了！お疲れ様でした','#81C784');
+    setTimeout(()=>{timerState='idle';refreshView();},2000);
+  } else {
+    currentRound=next; phase='keiko';
+    remainingSec=keikoMin*60+keikoSec;
+    timerState='running';
+    startTick();
+    beepKeikoStart();
+    showToast(`${currentRound} 本目　稽古開始！`,'#64B5F6');
+    updateRunUI();
+  }
+}
+
+// ===== RUNNING UI =====
+function updateRunUI(){
+  const waiting=(timerState==='waiting');
+  const isKeiko=(phase==='keiko');
+
+  // time display
+  if(waiting){
+    document.getElementById('time-display').textContent='--:--';
+    document.getElementById('time-label').textContent='待機中';
+  } else {
+    const m=Math.floor(remainingSec/60),s=remainingSec%60;
+    document.getElementById('time-display').textContent=`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    document.getElementById('time-label').textContent='残り時間';
+  }
+
+  document.getElementById('round-main').textContent=`${currentRound} 本目`;
+  document.getElementById('round-ratio').textContent=repeatCount===null?'∞':`${currentRound} / ${repeatCount}`;
+
+  // phase badge
+  const badge=document.getElementById('phase-badge');
+  if(waiting){
+    badge.className='phase-badge phase-waiting';
+    badge.textContent='💤 インターバル中';
+  } else if(isKeiko){
+    badge.className='phase-badge phase-keiko';
+    badge.textContent='🥋 稽古中';
+  } else {
+    badge.className='phase-badge phase-interval';
+    badge.textContent='💤 インターバル';
+  }
+
+  // tap overlay
+  document.getElementById('tap-overlay').style.display=waiting?'flex':'none';
+
+  // ring
+  if(waiting){
+    drawRing(0, false, true);
+  } else {
+    const total=isKeiko?(keikoMin*60+keikoSec):(intervalMin*60+intervalSec);
+    drawRing(total>0?remainingSec/total:0, isKeiko, false);
+  }
+
+  // pause button state
+  const pauseDisabled=waiting;
+  document.getElementById('btn-pause').style.opacity=pauseDisabled?'0.35':'1';
+  document.getElementById('btn-pause').style.pointerEvents=pauseDisabled?'none':'auto';
+}
+
+function drawRing(prog, isKeiko, isWaiting){
+  const c=document.getElementById('progress-canvas');
+  const ctx=c.getContext('2d');
+  const cx=105,cy=105,r=92;
+  ctx.clearRect(0,0,210,210);
+  ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);
+  ctx.strokeStyle='rgba(255,255,255,0.1)';ctx.lineWidth=8;ctx.stroke();
+  if(isWaiting){
+    // pulsing ring
+    ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);
+    ctx.strokeStyle='rgba(255,183,77,0.25)';ctx.lineWidth=8;ctx.stroke();
+    return;
+  }
+  if(prog>0){
+    const color=isKeiko?(prog>0.35?'#64B5F6':'#EF5350'):(prog>0.35?'#FFB74D':'#FF7043');
+    ctx.beginPath();ctx.arc(cx,cy,r,-Math.PI/2,-Math.PI/2+Math.PI*2*prog);
+    ctx.strokeStyle=color;ctx.lineWidth=8;ctx.lineCap='round';ctx.stroke();
+  }
+}
+
+// ===== SETTINGS =====
+function renderSettings(){
+  renderRoundPicker();
+  // render spinners
+  renderSpinner('spinner-keiko',   keikoMin,   keikoSec,   (m,s)=>{keikoMin=m;   keikoSec=s;   updateIdleSummary();});
+  renderSpinner('spinner-interval',intervalMin, intervalSec,(m,s)=>{intervalMin=m; intervalSec=s; updateIdleSummary();});
+  // manual toggle state
+  document.getElementById('manual-toggle').checked=manualInterval;
+  document.getElementById('manual-note').style.display=manualInterval?'block':'none';
+  document.getElementById('interval-time-card').style.opacity=manualInterval?'0.35':'1';
+  document.getElementById('interval-time-card').style.pointerEvents=manualInterval?'none':'auto';
+}
+function onManualToggle(){
+  manualInterval=document.getElementById('manual-toggle').checked;
+  document.getElementById('manual-note').style.display=manualInterval?'block':'none';
+  document.getElementById('interval-time-card').style.opacity=manualInterval?'0.35':'1';
+  document.getElementById('interval-time-card').style.pointerEvents=manualInterval?'none':'auto';
+  updateIdleSummary();
+}
+
+// ── 本数ピッカー ──
+let roundScrollTimer=null;
+function renderRoundPicker(){
+  const list=document.getElementById('round-list');
+  list.innerHTML='';
+  const items=['∞ 無限',...Array.from({length:100},(_,i)=>`${i+1} 本`)];
+  items.forEach((label,i)=>{
+    const div=document.createElement('div');
+    div.className='round-item'+(i===(repeatCount===null?0:repeatCount)?' selected':'');
+    div.textContent=label;
+    list.appendChild(div);
+  });
+  const selIdx=repeatCount===null?0:repeatCount;
+  list.scrollTop=selIdx*38;
+  list.onscroll=()=>{
+    clearTimeout(roundScrollTimer);
+    roundScrollTimer=setTimeout(()=>{
+      const idx=Math.round(list.scrollTop/38);
+      repeatCount=idx===0?null:idx;
+      document.querySelectorAll('.round-item').forEach((el,i)=>el.classList.toggle('selected',i===idx));
+      updateIdleSummary();
+    },80);
+  };
+}
+
+// ── ドラムロールピッカー ──
+function renderSpinner(containerId, initMin, initSec, onChange){
+  const wrap=document.getElementById(containerId);
+  wrap.innerHTML='';
+  let curMin=initMin, curSec=initSec;
+
+  function makeDrumUnit(labelText, initVal, count, onVal){
+    const col=document.createElement('div'); col.className='picker-col';
+    const lbl=document.createElement('label'); lbl.textContent=labelText;
+
+    const outer=document.createElement('div'); outer.className='drum-wrap';
+    const sel=document.createElement('div');   sel.className='drum-sel';
+    const drum=document.createElement('div');  drum.className='picker-drum';
+
+    // 上下パディング（中央揃えのため）
+    const padPx=44; // (132 - 44) / 2
+    const p1=document.createElement('div'); p1.style.height=padPx+'px'; drum.appendChild(p1);
+    for(let i=0;i<count;i++){
+      const item=document.createElement('div');
+      item.className='drum-item'+(i===initVal?' center':'');
+      item.textContent=String(i).padStart(2,'0');
+      drum.appendChild(item);
+    }
+    const p2=document.createElement('div'); p2.style.height=padPx+'px'; drum.appendChild(p2);
+
+    outer.appendChild(sel);
+    outer.appendChild(drum);
+    col.appendChild(lbl);
+    col.appendChild(outer);
+
+    // スクロール位置を初期値に
+    setTimeout(()=>{ drum.scrollTop=initVal*44; },0);
+
+    let t=null;
+    drum.addEventListener('scroll',()=>{
+      clearTimeout(t);
+      t=setTimeout(()=>{
+        const val=Math.max(0,Math.min(count-1,Math.round(drum.scrollTop/44)));
+        // snap
+        drum.scrollTo({top:val*44,behavior:'smooth'});
+        drum.querySelectorAll('.drum-item').forEach((el,i)=>el.classList.toggle('center',i===val));
+        onVal(val);
+      },120);
+    });
+    return col;
+  }
+
+  const minCol=makeDrumUnit('分',curMin,60,v=>{curMin=v;onChange(curMin,curSec);});
+  const colon=document.createElement('div'); colon.className='colon-sep'; colon.textContent=':';
+  const secCol=makeDrumUnit('秒',curSec,60,v=>{curSec=v;onChange(curMin,curSec);});
+
+  wrap.appendChild(minCol);
+  wrap.appendChild(colon);
+  wrap.appendChild(secCol);
+}
+
+// ===== INIT =====
+updateIdleSummary();
+</script>
+</body>
+</html>
