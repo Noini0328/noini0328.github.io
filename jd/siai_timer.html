@@ -191,7 +191,20 @@ body{background:#0d0d1a;color:#fff;font-family:system-ui,-apple-system,sans-seri
     <div class="setting-section">
       <div class="setting-section-title">🔒 抑え込み</div>
       <div class="setting-row">
-        <label>最大秒数（一本）</label>
+        <label>技あり（秒）</label>
+        <div class="val-ctrl">
+          <button class="circ" style="border-color:#ffd700;color:#ffd700" onclick="adjSetting('osaeWazaari',-1)">
+            <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+          <div class="val-display" id="disp-osaeWazaari">10秒</div>
+          <button class="circ" style="border-color:#ffd700;color:#ffd700" onclick="adjSetting('osaeWazaari',1)">
+            <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="setting-divider"></div>
+      <div class="setting-row">
+        <label>一本（秒）</label>
         <div class="val-ctrl">
           <button class="circ" style="border-color:#ffd700;color:#ffd700" onclick="adjSetting('osaeMax',-1)">
             <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -223,9 +236,11 @@ body{background:#0d0d1a;color:#fff;font-family:system-ui,-apple-system,sans-seri
         </div>
       </div>
     </div>
+
     <div class="preview-box">
       <div class="preview-title">📋 設定プレビュー</div>
       <div class="preview-row"><span class="pl">試合時間：</span><span class="pv" id="prev-matchDur"></span></div>
+      <div class="preview-row"><span class="pl">抑え込み技あり：</span><span class="pv" id="prev-osaeWazaari"></span></div>
       <div class="preview-row"><span class="pl">抑え込み一本：</span><span class="pv" id="prev-osaeMax"></span></div>
       <div class="preview-row"><span class="pl">指導判定：</span><span class="pv" id="prev-shido"></span></div>
     </div>
@@ -236,17 +251,19 @@ body{background:#0d0d1a;color:#fff;font-family:system-ui,-apple-system,sans-seri
   </div>
 </div>
 
+
 <script>
 // ─── 状態 ───────────────────────────────────────────────────────────
 const S = {
-  settings: { matchDur: 240, osaeMax: 20, shidoEnabled: true, shidoLim: 3 },
+  settings: { matchDur: 240, osaeWazaari: 10, osaeMax: 20, shidoEnabled: true, shidoLim: 3 },
   aka: { ippon:0, wazaari:0, yuko:0, shido:0, osaeKomiSecs:0 },
   shiro: { ippon:0, wazaari:0, yuko:0, shido:0, osaeKomiSecs:0 },
   status: 'idle', // idle | running | paused | finished
   remaining: 240,
   osaeSide: null, // null | 'aka' | 'shiro'
   osaeRunning: false,
-  history: []
+  history: [],
+  endSoundSrc: ''
 };
 
 let matchTimer = null;
@@ -310,9 +327,11 @@ function startMatchTimer() {
 
 function startMatch() {
   if (S.status === 'finished') return;
-  if (S.status === 'idle') S.remaining = S.settings.matchDur;
+  if (S.status === 'idle') {
+    S.remaining = S.settings.matchDur;
+    playStartSound();
+  }
   S.status = 'running';
-  playStartSound();
   startMatchTimer();
   render();
 }
@@ -400,15 +419,24 @@ function startOsaeTimer(side) {
   osaeTimer = setInterval(() => {
     const p = S[side];
     p.osaeKomiSecs++;
+    const cfg = S.settings;
+    // 技あり付与（まだ2未満のとき、閾値到達した瞬間のみ）
+    if (p.osaeKomiSecs === cfg.osaeWazaari && p.wazaari < 2) {
+      pushHistory();
+      p.wazaari = Math.min(2, p.wazaari + 1);
+    }
     render();
-    if (p.osaeKomiSecs >= S.settings.osaeMax) {
+    // 一本付与
+    if (p.osaeKomiSecs >= cfg.osaeMax) {
       clearInterval(osaeTimer);
       S.osaeRunning = false;
       S.osaeSide = null;
       pushHistory();
       S[side].ippon = Math.min(1, S[side].ippon + 1);
       finishMatch(false);
+      return;
     }
+    if (isDecided() && S.status === 'running') finishMatch(false);
   }, 1000);
 }
 
@@ -440,58 +468,36 @@ function handleOsaeRelease(side) {
   render();
 }
 
-// ─── 開始音・終了音（Web Audio APIで合成） ─────────────────────────────
-let actx = null;
-let masterGain = null;
-function getACtx() {
-  if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
-  return actx;
+// ─── Web Audio ───────────────────────────────────────────────────────
+const _ac = new (window.AudioContext || window.webkitAudioContext)();
+
+function _beep(freq, duration, startTime, vol) {
+  const g = _ac.createGain();
+  g.gain.setValueAtTime(vol, startTime);
+  g.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+  const o = _ac.createOscillator();
+  o.type = 'square';
+  o.frequency.setValueAtTime(freq, startTime);
+  o.connect(g); g.connect(_ac.destination);
+  o.start(startTime); o.stop(startTime + duration + 0.01);
 }
-// 出力段：ゲインを底上げしつつコンプレッサーで音割れを抑え、体感音量を最大限に大きくする
-function getMasterChain() {
-  const a = getACtx();
-  if (!masterGain) {
-    masterGain = a.createGain();
-    masterGain.gain.value = 3.0; // ブースト
-    const comp = a.createDynamicsCompressor();
-    comp.threshold.setValueAtTime(-16, a.currentTime);
-    comp.knee.setValueAtTime(14, a.currentTime);
-    comp.ratio.setValueAtTime(14, a.currentTime);
-    comp.attack.setValueAtTime(0.002, a.currentTime);
-    comp.release.setValueAtTime(0.15, a.currentTime);
-    masterGain.connect(comp);
-    comp.connect(a.destination);
-  }
-  return masterGain;
-}
-function schedTone(freq, startOffset, dur, vol = 1.0, type = 'square') {
-  try {
-    const a = getACtx();
-    const mg = getMasterChain();
-    const osc = a.createOscillator();
-    const osc2 = a.createOscillator();
-    const g = a.createGain();
-    const now = a.currentTime + startOffset;
-    osc.type = type; osc2.type = 'sine';
-    osc.frequency.value = freq;
-    osc2.frequency.value = freq * 1.5;
-    osc.connect(g); osc2.connect(g); g.connect(mg);
-    g.gain.setValueAtTime(vol, now);
-    g.gain.setValueAtTime(vol, now + dur - 0.03);
-    g.gain.linearRampToValueAtTime(0, now + dur);
-    osc.start(now); osc2.start(now);
-    osc.stop(now + dur); osc2.stop(now + dur);
-  } catch (e) {}
-}
-// 【開始音】880Hzで1.5秒の単音ピーーー
+
+// 開始音：880Hz・1.5秒の単音ピーーー
 function playStartSound() {
-  schedTone(880, 0, 1.5, 1.0);
+  if (_ac.state === 'suspended') _ac.resume();
+  _beep(880, 1.5, _ac.currentTime, 1.0);
 }
-// 【終了音】880Hzで0.1秒×4回→0.3秒休み を3グループ（総計約1.8秒）
+
+// 終了音：880Hz・0.1秒×4連打→0.3秒休み を3セット
 function playEndSound() {
-  for (let i = 0; i < 4; i++) schedTone(880, i * 0.1,       0.08, 1.0);
-  for (let i = 0; i < 4; i++) schedTone(880, 0.7 + i * 0.1, 0.08, 1.0);
-  for (let i = 0; i < 4; i++) schedTone(880, 1.4 + i * 0.1, 0.08, 1.0);
+  if (_ac.state === 'suspended') _ac.resume();
+  const t0 = _ac.currentTime;
+  for (let set = 0; set < 3; set++) {
+    const base = t0 + set * (4 * 0.1 + 0.3); // 1セット = 0.4+0.3 = 0.7秒
+    for (let i = 0; i < 4; i++) {
+      _beep(880, 0.1, base + i * 0.1, 1.0);
+    }
+  }
 }
 
 // ─── 設定 ────────────────────────────────────────────────────────────
@@ -503,6 +509,7 @@ function openSettings() {
 }
 function adjSetting(key, delta) {
   if (key === 'matchDur')  tmpSettings.matchDur  = Math.max(60, Math.min(600, tmpSettings.matchDur + delta));
+  if (key === 'osaeWazaari') tmpSettings.osaeWazaari = Math.max(1, Math.min(59, tmpSettings.osaeWazaari + delta));
   if (key === 'osaeMax')   tmpSettings.osaeMax   = Math.max(5, Math.min(60, tmpSettings.osaeMax + delta));
   if (key === 'shidoLim')  tmpSettings.shidoLim  = Math.max(1, Math.min(5, tmpSettings.shidoLim + delta));
   updateSettingsUI();
@@ -516,6 +523,7 @@ function updateSettingsUI() {
   const m = t.matchDur;
   document.getElementById('disp-matchDur').textContent =
     m % 60 === 0 ? `${m/60}分` : `${Math.floor(m/60)}分${m%60}秒`;
+  document.getElementById('disp-osaeWazaari').textContent = t.osaeWazaari + '秒';
   document.getElementById('disp-osaeMax').textContent = t.osaeMax + '秒';
   document.getElementById('disp-shidoLim').textContent = t.shidoLim + '回';
   const sw = document.getElementById('switch-shido');
@@ -523,6 +531,7 @@ function updateSettingsUI() {
   document.getElementById('shido-count-row').style.display = t.shidoEnabled ? '' : 'none';
   document.getElementById('prev-matchDur').textContent =
     m % 60 === 0 ? `${m/60}分` : `${Math.floor(m/60)}分${m%60}秒`;
+  document.getElementById('prev-osaeWazaari').textContent = t.osaeWazaari + '秒';
   document.getElementById('prev-osaeMax').textContent = t.osaeMax + '秒';
   document.getElementById('prev-shido').textContent =
     t.shidoEnabled ? `${t.shidoLim}回で負け` : '無効';
@@ -629,9 +638,12 @@ function renderPanel(side) {
   const osaeActive = isMyOsae;
   const osaeIsRunning = isMyOsae && S.osaeRunning;
   const secs = p.osaeKomiSecs;
+  const wazaariSecs = cfg.osaeWazaari;
   const maxSecs = cfg.osaeMax;
   const prog = maxSecs > 0 ? Math.min(1, secs / maxSecs) : 0;
-  const barColor = prog < 0.5 ? '#4caf50' : prog < 0.8 ? '#ffd700' : '#ff5722';
+  const wazaariProg = maxSecs > 0 ? Math.min(1, wazaariSecs / maxSecs) : 0;
+  // 技あり到達前→緑、技あり〜一本前→黄、一本→赤
+  const barColor = secs < wazaariSecs ? '#4caf50' : secs < maxSecs ? '#ffd700' : '#ff5722';
 
   // ─── DOM構築（差分更新のため毎回再生成は避けてinnerHTMLで）───
   // (パフォーマンス上問題ない規模なのでinnerHTMLで生成)
@@ -680,7 +692,7 @@ function renderPanel(side) {
     <div class="osae-header">
       <span class="emoji">🔒</span>
       <span class="ltext">抑え込み</span>
-      <span class="maxsec">最大${maxSecs}秒</span>
+      <span class="maxsec">技あり${wazaariSecs}秒／一本${maxSecs}秒</span>
     </div>
     <div class="osae-controls">
       <button class="osae-btn" style="border-color:${startPauseDisabled?'rgba(255,255,255,.24)':startBtnColor};color:${startPauseDisabled?'rgba(255,255,255,.24)':startBtnColor}"
@@ -697,7 +709,10 @@ function renderPanel(side) {
         <span class="btn-label">解けた</span>
       </button>
     </div>
-    ${osaeActive ? `<div class="osae-progress"><div class="osae-bar" style="width:${(prog*100).toFixed(1)}%;background:${barColor}"></div></div>` : ''}
+    ${osaeActive ? `<div class="osae-progress" style="position:relative">
+      <div class="osae-bar" style="width:${(prog*100).toFixed(1)}%;background:${barColor}"></div>
+      <div style="position:absolute;top:-4px;left:${(wazaariProg*100).toFixed(1)}%;width:2px;height:12px;background:#ffd700;border-radius:1px;transform:translateX(-50%)" title="技あり"></div>
+    </div>` : ''}
   </div>`;
 
   container.innerHTML = html;
