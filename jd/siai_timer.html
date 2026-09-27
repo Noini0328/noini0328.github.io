@@ -635,17 +635,39 @@ function renderHdr(){
   const low=S.remaining<=30&&S.status==='running';
   el.textContent=fmtT(S.remaining);el.className=low?'low':'';
   const sb=document.getElementById('status-badge');
-  const sm={idle:['待機中','rgba(255,255,255,.5)'],running:['試合中','#a5d6a7'],
-    paused:['停止中','#fff176'],finished:['終　了','#ef9a9a']};
-  const[st,sc]=sm[S.status];
-  sb.textContent=st;sb.style.color=sc;sb.style.borderColor=sc;sb.style.background=sc+'30';
+  const sm={
+    idle:    ['待機中', '#546e7a', '#fff'],
+    running: ['試合中', '#2e7d32', '#fff'],
+    paused:  ['停止中', '#f57f17', '#fff'],
+    finished:['終　了', '#c62828', '#fff'],
+  };
+  const[st,sbg,sfg]=sm[S.status];
+  sb.textContent=st;
+  sb.style.color=sfg;
+  sb.style.borderColor=sbg;
+  sb.style.background=sbg;
   const rb=document.getElementById('result-badge');
   const r=getResult();
-  const rm={aka:['赤 勝ち','#e53935','rgba(229,57,53,.15)'],
-    shiro:['白 勝ち','#78909c','rgba(120,144,156,.15)'],
-    draw:['引き分け','#f9a825','rgba(249,168,37,.15)']};
-  if(rm[r]){const[t,c,bg]=rm[r];rb.textContent=t;rb.style.color=c;rb.style.borderColor=c;rb.style.background=bg;}
-  else{rb.textContent='－';rb.style.color='rgba(255,255,255,.35)';rb.style.borderColor='rgba(255,255,255,.25)';rb.style.background='transparent';}
+  // 勝敗バッジ：完全塗りつぶしで見やすく
+  const rm={
+    aka:  ['🔴 赤 勝ち', '#c62828', '#fff'],
+    shiro:['⚪ 白 勝ち', '#455a64', '#fff'],
+    draw: ['引き分け',   '#e65100', '#fff'],
+  };
+  if(rm[r]){
+    const[t,bg,fg]=rm[r];
+    rb.textContent=t;
+    rb.style.color=fg;
+    rb.style.borderColor=bg;
+    rb.style.background=bg;
+    rb.style.fontWeight='900';
+  } else {
+    rb.textContent='勝敗判定中';
+    rb.style.color='rgba(255,255,255,.55)';
+    rb.style.borderColor='rgba(255,255,255,.25)';
+    rb.style.background='rgba(255,255,255,.1)';
+    rb.style.fontWeight='700';
+  }
 }
 
 function renderPanel(side){
