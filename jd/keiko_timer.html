@@ -412,17 +412,17 @@ function schedTone(freq, startOffset, dur, vol=1.0, type='square'){
     osc.start(now); osc2.start(now); osc.stop(now+dur); osc2.stop(now+dur);
   }catch(e){}
 }
-function beepKeikoStart(){schedTone(880,0,1.5,1.0);}
-function beepFinish(){
-  for(let i=0;i<4;i++) schedTone(880,i*0.1,        0.08,1.0);
-  for(let i=0;i<4;i++) schedTone(880,0.7+i*0.1,    0.08,1.0);
-  for(let i=0;i<4;i++) schedTone(880,1.4+i*0.1,    0.08,1.0);
+function beepKeikoStart(){
+  schedTone(880,0,1.5,1.0);
 }
-function beepIntervalStart(){
-  schedTone(660,0,   0.12,0.9);
-  schedTone(660,0.18,0.12,0.9);
-  schedTone(660,0.36,0.12,0.9);
+function beepPipPattern(){
+  // 880Hz・0.1秒×4連打→0.3秒休み を3セット
+  for(let i=0;i<4;i++) schedTone(880, i*0.1,        0.08, 1.0);
+  for(let i=0;i<4;i++) schedTone(880, 0.7+i*0.1,    0.08, 1.0);
+  for(let i=0;i<4;i++) schedTone(880, 1.4+i*0.1,    0.08, 1.0);
 }
+function beepFinish(){ beepPipPattern(); }
+function beepIntervalStart(){ beepPipPattern(); }
 
 // ===== TOAST =====
 let toastTimer=null;
