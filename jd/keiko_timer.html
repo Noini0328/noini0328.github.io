@@ -694,6 +694,18 @@ function renderSpinner(containerId,initMin,initSec,onChange){
 
 // ===== INIT =====
 updateIdleSummary();
+
+// ===== iOS Safari バウンススクロール防止 =====
+// タイマー画面（idle/running）ではtouchmoveをキャンセル
+// 設定画面内のスクロール要素（round-list, picker-drum）は通過させる
+document.addEventListener('touchmove', function(e){
+  // 設定画面が表示中はスキップ
+  if(currentTab === 'settings') return;
+  // スクロール可能な子要素の内側なら通過
+  const scrollable = e.target.closest('#round-list, .picker-drum');
+  if(scrollable) return;
+  e.preventDefault();
+}, { passive: false });
 </script>
 </body>
 </html>
