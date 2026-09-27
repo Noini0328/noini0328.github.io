@@ -1,767 +1,763 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="ja" data-theme="light">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>柔道審判タイマー</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#0d0d1a;color:#fff;font-family:system-ui,-apple-system,sans-serif;height:100dvh;display:flex;flex-direction:column;overflow:hidden;user-select:none}
+:root{
+  --aka:#c0202e;--aka-bg:#fff0f0;--aka-dim:rgba(192,32,46,.12);--aka-txt:#8b0000;
+  --shiro:#555;--shiro-bg:#f8f8ff;--shiro-dim:rgba(100,100,130,.1);--shiro-txt:#333;
+  --gold:#c8a000;--green:#2e7d32;--orange:#c62828;--blue:#1565c0;
+  --surf:#e8eaf6;--deep:#f0f2f8;--border:rgba(0,0,0,.12);
+  --txt:#1a1a2e;--txt2:rgba(20,20,50,.6);--card-bg:rgba(255,255,255,.85);
+  --hdr-bg:#3949ab;--hdr-txt:#fff;
+  --foot-bg:#3949ab;--foot-txt:#fff;
+  --shadow:0 2px 8px rgba(0,0,0,.12);
+  --st:env(safe-area-inset-top,0px);--sb:env(safe-area-inset-bottom,0px);
+}
+[data-theme="dark"]{
+  --aka:#e53935;--aka-bg:#1e080a;--aka-dim:rgba(229,57,53,.15);--aka-txt:#ff8a80;
+  --shiro:#ccc;--shiro-bg:#0a0a18;--shiro-dim:rgba(200,200,200,.1);--shiro-txt:#ddd;
+  --gold:#ffd700;--green:#4caf50;--orange:#ff5722;--blue:#42a5f5;
+  --surf:#16213e;--deep:#0d0d1a;--border:rgba(255,255,255,.12);
+  --txt:#f0f0ff;--txt2:rgba(220,220,255,.55);--card-bg:rgba(255,255,255,.05);
+  --hdr-bg:#0f1a3d;--hdr-txt:#e8eaf6;
+  --foot-bg:#0f1a3d;--foot-txt:#e8eaf6;
+  --shadow:0 2px 8px rgba(0,0,0,.4);
+}
+html,body{height:100%;overflow:hidden}
+body{background:var(--deep);color:var(--txt);
+  font-family:system-ui,-apple-system,'Helvetica Neue',sans-serif;
+  display:flex;flex-direction:column;
+  padding-top:var(--st);padding-bottom:var(--sb);
+  user-select:none;-webkit-tap-highlight-color:transparent;transition:background .3s,color .3s;}
 
-/* ヘッダー */
-#header{background:#16213e;padding:6px 10px;display:flex;align-items:center;gap:8px;flex-shrink:0;min-height:44px}
-#header .spacer{flex:1}
-#status-badge{padding:2px 7px;border-radius:5px;font-size:10px;font-weight:700;letter-spacing:1px;border:1px solid;white-space:nowrap}
-#timer-display{padding:3px 12px;border-radius:8px;font-size:28px;font-weight:900;letter-spacing:2px;border:1px solid;font-variant-numeric:tabular-nums;white-space:nowrap;transition:all .3s}
-#result-badge{padding:3px 8px;border-radius:7px;font-size:12px;font-weight:700;border:1px solid;display:flex;align-items:center;gap:3px;white-space:nowrap}
-#settings-btn{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);border-radius:7px;padding:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-#settings-btn svg{width:18px;height:18px;stroke:#888;fill:none;stroke-width:1.8}
+/* ── ヘッダー ── */
+#hdr{background:var(--hdr-bg);display:flex;align-items:center;gap:8px;
+  padding:8px 12px;flex-shrink:0;box-shadow:var(--shadow);}
+#settings-btn{background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.35);
+  border-radius:9px;padding:8px 12px;cursor:pointer;display:flex;align-items:center;
+  gap:6px;color:var(--hdr-txt);font-size:15px;font-weight:700;}
+#settings-btn svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2}
+.hbadge{padding:5px 12px;border-radius:7px;font-size:14px;font-weight:800;
+  letter-spacing:.6px;border:2px solid;white-space:nowrap;}
+#status-badge{color:var(--hdr-txt);border-color:rgba(255,255,255,.5);background:rgba(255,255,255,.15)}
+#hdr-r{margin-left:auto;display:flex;align-items:center;}
+#result-badge{padding:6px 14px;border-radius:10px;font-size:16px;font-weight:900;
+  border:2.5px solid;white-space:nowrap;text-align:center;min-width:90px;}
 
-/* メインエリア */
-#main{flex:1;display:flex;overflow:hidden;min-height:0}
-.panel{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0;min-width:0}
-.panel.aka{background:#200a0c}
-.panel.shiro{background:#0e0e1e}
-.divider-v{width:1.5px;background:rgba(255,255,255,.12);flex-shrink:0}
-.divider-h{height:1.5px;background:rgba(255,255,255,.12);flex-shrink:0}
+/* ── 大タイマー ── */
+#timer-row{background:var(--hdr-bg);display:flex;align-items:center;justify-content:center;
+  padding:6px 0 10px;flex-shrink:0;}
+#timer{font-size:clamp(48px,12vw,88px);font-weight:900;letter-spacing:4px;
+  font-variant-numeric:tabular-nums;color:var(--hdr-txt);
+  padding:0 16px;border-radius:10px;line-height:1.15;transition:color .3s;}
+#timer.low{color:#ffcdd2;animation:pulse .7s ease-in-out infinite alternate;}
+@keyframes pulse{from{opacity:1}to{opacity:.55}}
 
-/* パネルヘッダー */
-.panel-header{padding:4px;text-align:center;font-size:16px;font-weight:900;letter-spacing:6px;flex-shrink:0}
-.aka .panel-header{background:rgba(204,41,54,.18);color:#cc2936}
-.shiro .panel-header{background:rgba(204,204,204,.18);color:#ccc}
+/* ── メイン ── */
+#main{flex:1;display:flex;flex-direction:row;overflow:hidden;min-height:0;position:relative;}
+.panel{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0;min-width:0;}
+.panel.aka{background:var(--aka-bg)}.panel.shiro{background:var(--shiro-bg)}
+.divider{width:2px;background:var(--border);flex-shrink:0}
+.phdr{padding:6px 4px;text-align:center;font-size:clamp(16px,3vw,24px);font-weight:900;
+  letter-spacing:7px;flex-shrink:0;}
+.aka .phdr{background:var(--aka-dim);color:var(--aka)}
+.shiro .phdr{background:var(--shiro-dim);color:var(--shiro)}
 
 /* スコアエリア */
-.scores{flex:1;display:flex;flex-direction:column;padding:3px 4px 2px;gap:2px;overflow:hidden;min-height:0}
+.scores{flex:1;display:flex;flex-direction:column;padding:3px 4px 2px;gap:3px;
+  overflow:hidden;min-height:0;}
+/* 2カラムペア（一本+技あり、有効+指導） */
+.score-pair{display:flex;gap:3px;flex:1;min-height:0;}
+/* 抑え込み：1カラム高（flex:1と同じ） */
+.osae-wrap{flex:1;min-height:0;}
 
-/* スコア行 */
-.score-row{flex:1;display:flex;align-items:center;background:rgba(255,255,255,.03);border-radius:7px;border:1px solid;overflow:hidden;min-height:0}
-.score-label{width:52px;padding-left:5px;display:flex;align-items:center;gap:2px;flex-shrink:0}
-.score-label .emoji{font-size:11px}
-.score-label .ltext{font-size:10px;font-weight:600;color:rgba(255,255,255,.6);white-space:nowrap}
-.score-center{flex:1;display:flex;align-items:center;justify-content:center;gap:6px}
-.score-num-wrap{width:40px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center}
-.score-num{font-weight:900;line-height:1;font-variant-numeric:tabular-nums}
-.score-badge{font-size:8px;font-weight:700;line-height:1.2;margin-top:1px}
-.round-btn{border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;border:1px solid;flex-shrink:0;background:rgba(255,255,255,.03);transition:opacity .15s}
-.round-btn:active{opacity:.7}
-.round-btn:disabled{opacity:.25;cursor:default;pointer-events:none}
-.round-btn svg{stroke-width:2;stroke:currentColor;fill:none}
+/* ── スコアカード ── */
+.scard{flex:1;position:relative;border-radius:10px;border:2px solid;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  cursor:pointer;overflow:hidden;min-height:0;transition:filter .12s,box-shadow .12s;
+  background:var(--card-bg);box-shadow:var(--shadow);}
+.scard:active{filter:brightness(.88);box-shadow:none;}
+.scard.disabled{opacity:.35;cursor:default;pointer-events:none}
+/* 統一ラベルサイズ変数 */
+:root{--lbl:clamp(13px,2.5vw,20px);}
+.sc-label{font-size:var(--lbl);font-weight:800;color:var(--txt2);
+  letter-spacing:.3px;line-height:1;}
+.sc-val{font-size:clamp(36px,8.5vw,70px);font-weight:900;line-height:1;
+  font-variant-numeric:tabular-nums;}
+.sc-badge{font-size:clamp(7px,1.2vw,11px);font-weight:700;line-height:1.1;}
+.inv-btn{position:absolute;bottom:2px;right:3px;font-size:clamp(8px,1.1vw,11px);
+  font-weight:700;padding:2px 5px;border-radius:4px;border:1.5px solid;
+  cursor:pointer;line-height:1;z-index:2;background:rgba(0,0,0,.06);}
+[data-theme="dark"] .inv-btn{background:rgba(0,0,0,.3);color:rgba(255,255,255,.5);
+  border-color:rgba(255,255,255,.25);}
+[data-theme="light"] .inv-btn{color:rgba(0,0,0,.45);border-color:rgba(0,0,0,.22);}
+.inv-btn:active{filter:brightness(.85)}
+.inv-btn.disabled{opacity:.2;pointer-events:none}
 
-/* 抑え込みエリア */
-.osae-row{flex:2;background:rgba(255,255,255,.03);border-radius:7px;border:1px solid rgba(255,255,255,.24);display:flex;flex-direction:column;justify-content:center;padding:3px 5px;gap:2px;overflow:hidden;min-height:0}
-.osae-row.active{background:#0d2b0d;border-color:#4caf50;border-width:2px}
-.osae-header{display:flex;align-items:center;gap:3px}
-.osae-header .emoji{font-size:9px}
-.osae-header .ltext{font-size:10px;font-weight:600;color:rgba(255,255,255,.6)}
-.osae-header .maxsec{margin-left:auto;font-size:9px;color:rgba(255,255,255,.38)}
-.osae-controls{display:flex;align-items:center;gap:4px}
-.osae-btn{flex:1;border-radius:5px;border:1px solid;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:2px;padding:3px 2px;background:rgba(255,255,255,.03);transition:opacity .15s}
-.osae-btn:active{opacity:.7}
-.osae-btn:disabled{opacity:.25;cursor:default;pointer-events:none}
-.osae-btn .btn-icon{width:12px;height:12px;stroke-width:2;stroke:currentColor;fill:none;flex-shrink:0}
-.osae-btn .btn-label{font-size:9px;font-weight:700;white-space:nowrap}
-.osae-secs-wrap{width:44px;text-align:center;flex-shrink:0}
-.osae-secs{font-size:26px;font-weight:900;line-height:1;font-variant-numeric:tabular-nums}
-.osae-unit{font-size:9px;line-height:1.2}
-.osae-progress{height:4px;background:rgba(255,255,255,.12);border-radius:3px;overflow:hidden;margin:0 2px}
-.osae-bar{height:100%;border-radius:3px;transition:width .9s linear}
+/* ── 抑え込みカード：縦レイアウト（ラベル上・ボタン下横並び） ── */
+.osae-card{height:100%;border-radius:10px;border:2px solid var(--border);
+  display:flex;flex-direction:column;align-items:stretch;
+  padding:5px 5px 5px;gap:5px;overflow:hidden;background:var(--card-bg);
+  box-shadow:var(--shadow);position:relative;}
+.osae-card.active{background:#e8f5e9;border-color:#2e7d32;border-width:2.5px;}
+[data-theme="dark"] .osae-card.active{background:rgba(10,50,10,.85);border-color:#4caf50;}
+/* ラベル行（上段） */
+.osae-info{display:flex;flex-direction:row;align-items:center;justify-content:center;
+  gap:8px;flex-shrink:0;}
+.otitle{font-size:var(--lbl);font-weight:800;color:var(--txt2);white-space:nowrap;}
+.othresh{font-size:clamp(9px,1.4vw,12px);color:var(--txt2);opacity:.7;white-space:nowrap;}
+/* ボタン行（下段・横並び） */
+.osae-btn-row{display:flex;flex-direction:row;gap:5px;flex:1;min-height:0;}
+/* 抑え込みボタン：縦に伸びる大型 */
+.osae-abtn{flex:1;border-radius:9px;border:2.5px solid;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:4px;background:rgba(255,255,255,.04);transition:filter .12s;
+  -webkit-tap-highlight-color:transparent;min-width:0;}
+.osae-abtn:active{filter:brightness(.85)}
+.osae-abtn:disabled{opacity:.25;cursor:default;pointer-events:none}
+.osae-abtn svg{width:clamp(22px,4.5vw,38px);height:clamp(22px,4.5vw,38px);
+  stroke:currentColor;fill:none;stroke-width:2.2;}
+.osae-abtn span{font-size:var(--lbl);font-weight:800;line-height:1;}
+/* 縦進捗バー（ボタン行の右端に細く） */
+.osae-prog-v{width:6px;flex-shrink:0;background:rgba(0,0,0,.08);border-radius:3px;
+  position:relative;overflow:hidden;align-self:stretch;}
+[data-theme="dark"] .osae-prog-v{background:rgba(255,255,255,.1);}
+.osae-prog-fill{position:absolute;bottom:0;left:0;right:0;border-radius:3px;
+  transition:height .95s linear;}
+.osae-prog-mark{position:absolute;left:-2px;right:-2px;height:3px;
+  background:var(--gold);border-radius:2px;}
+/* ポップアップ：スコアエリア中央に重ねる */
+.osae-popup{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+  background:rgba(0,0,0,.78);color:#fff;border-radius:16px;
+  padding:10px 22px;text-align:center;pointer-events:none;z-index:50;
+  display:flex;flex-direction:column;align-items:center;gap:2px;
+  backdrop-filter:blur(6px);box-shadow:0 4px 24px rgba(0,0,0,.4);}
+.osae-popup-num{font-size:clamp(42px,10vw,80px);font-weight:900;line-height:1;
+  font-variant-numeric:tabular-nums;}
+.osae-popup-lbl{font-size:clamp(12px,2vw,18px);font-weight:700;opacity:.85;}
+.osae-popup-state{font-size:clamp(11px,1.8vw,16px);font-weight:700;margin-top:2px;}
 
-/* 縦レイアウト時 */
-@media (orientation:portrait){
-  #main{flex-direction:column}
-  .divider-v{display:none}
-  .divider-h{display:block}
-}
-@media (orientation:landscape){
-  #main{flex-direction:row}
-  .divider-v{display:block}
-  .divider-h{display:none}
-}
+/* ── フッター ── */
+#footer{background:var(--foot-bg);flex-shrink:0;
+  display:flex;flex-direction:row;align-items:stretch;
+  gap:6px;padding:8px 10px;box-shadow:0 -2px 8px rgba(0,0,0,.15);
+  min-height:84px;}
+#btn-main{flex:2;border-radius:14px;border:3px solid;cursor:pointer;
+  font-size:clamp(20px,4.5vw,30px);font-weight:900;letter-spacing:1px;
+  background:rgba(255,255,255,.12);transition:filter .12s;
+  color:var(--foot-txt);-webkit-tap-highlight-color:transparent;
+  display:flex;align-items:center;justify-content:center;}
+#btn-main:active{filter:brightness(1.3)}
+#btn-main:disabled{opacity:.35;cursor:default;pointer-events:none}
+.foot-btn{flex:1;border-radius:11px;border:2px solid;cursor:pointer;
+  font-size:clamp(14px,2.8vw,20px);font-weight:800;
+  background:rgba(255,255,255,.1);color:var(--foot-txt);
+  display:flex;align-items:center;justify-content:center;
+  transition:filter .12s;-webkit-tap-highlight-color:transparent;}
+.foot-btn:active{filter:brightness(1.25)}
+.foot-btn:disabled{opacity:.3;cursor:default;pointer-events:none}
 
-/* フッターコントロール */
-#footer{background:#16213e;padding:6px 8px;display:flex;align-items:center;justify-content:center;gap:6px;flex-shrink:0}
-.ctrl-btn{padding:7px 14px;border-radius:10px;border:1.5px solid;cursor:pointer;font-size:13px;font-weight:700;letter-spacing:.5px;background:rgba(255,255,255,.04);transition:opacity .15s;white-space:nowrap}
-.ctrl-btn:active{opacity:.7}
-.ctrl-btn:disabled{opacity:.25;cursor:default;pointer-events:none;border-color:rgba(255,255,255,.24);color:rgba(255,255,255,.24)}
-
-/* モーダル共通 */
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:100;padding:12px}
-.modal-overlay.hidden{display:none}
-.modal{background:#16213e;border-radius:14px;border:1px solid rgba(255,255,255,.12);padding:20px;width:100%;max-width:380px;max-height:90dvh;overflow-y:auto}
-.modal h2{color:#fff;font-size:17px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px}
-.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
-.modal-actions button{padding:7px 16px;border-radius:8px;border:none;cursor:pointer;font-size:14px;font-weight:700}
-.btn-cancel{background:rgba(255,255,255,.1);color:rgba(255,255,255,.7)}
+/* ── モーダル ── */
+.modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.65);
+  display:flex;align-items:center;justify-content:center;z-index:100;padding:12px;}
+.modal-ov.hidden{display:none}
+.modal{background:var(--surf);border-radius:16px;border:1px solid var(--border);
+  padding:20px;width:100%;max-width:420px;max-height:90dvh;overflow-y:auto;
+  color:var(--txt);box-shadow:0 8px 32px rgba(0,0,0,.3);}
+.modal h2{font-size:17px;font-weight:700;margin-bottom:14px;
+  display:flex;align-items:center;gap:8px;}
+.mact{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;}
+.mact button{padding:8px 18px;border-radius:8px;border:none;cursor:pointer;
+  font-size:14px;font-weight:700;}
+.btn-cancel{background:rgba(128,128,128,.2);color:var(--txt)}
 .btn-ok{color:#fff}
-
-/* 設定モーダル */
-.setting-section{background:#0f3460;border-radius:10px;border:1px solid rgba(255,255,255,.12);margin-bottom:12px;overflow:hidden}
-.setting-section-title{color:#ffd700;font-size:12px;font-weight:700;letter-spacing:1px;padding:8px 12px 4px}
-.setting-row{display:flex;align-items:center;padding:6px 12px}
-.setting-row label{flex:1;color:#fff;font-size:13px}
-.setting-row .val-ctrl{display:flex;align-items:center;gap:4px}
-.setting-row .val-display{width:64px;text-align:center;color:#fff;font-size:14px;font-weight:700}
-.setting-row .circ{width:30px;height:30px;border-radius:50%;border:1px solid;cursor:pointer;display:flex;align-items:center;justify-content:center;background:#0f3460}
-.setting-row .circ:disabled{opacity:.3;cursor:default}
-.setting-row .circ svg{width:14px;height:14px;stroke:currentColor;stroke-width:2;fill:none}
-.setting-divider{height:1px;background:rgba(255,255,255,.1);margin:0 12px}
-.switch-row{display:flex;align-items:center;padding:8px 12px}
-.switch-row label{flex:1;color:#fff;font-size:13px}
-.switch{width:40px;height:22px;border-radius:11px;border:none;cursor:pointer;position:relative;transition:background .2s;flex-shrink:0}
-.switch::after{content:'';position:absolute;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .2s}
-.switch.off{background:rgba(255,255,255,.2)}
-.switch.off::after{left:3px}
-.switch.on{background:#ffd700}
-.switch.on::after{left:21px}
-.preview-box{background:rgba(15,52,96,.4);border-radius:10px;border:1px solid rgba(255,215,0,.3);padding:12px}
-.preview-box .preview-title{color:#ffd700;font-size:12px;font-weight:700;margin-bottom:6px}
-.preview-row{display:flex;gap:4px;font-size:12px;margin-bottom:2px}
-.preview-row .pl{color:rgba(255,255,255,.6)}
-.preview-row .pv{color:#fff;font-weight:700}
+/* 設定 */
+.ss{background:rgba(255,255,255,.5);border-radius:10px;border:1px solid var(--border);
+  margin-bottom:12px;overflow:hidden;}
+[data-theme="dark"] .ss{background:rgba(255,255,255,.06);}
+.ss-title{color:#3949ab;font-size:12px;font-weight:700;letter-spacing:1px;padding:8px 14px 4px;}
+[data-theme="dark"] .ss-title{color:var(--gold);}
+.srow{display:flex;align-items:center;padding:7px 14px;}
+.srow label{flex:1;color:var(--txt);font-size:13px;}
+.vctrl{display:flex;align-items:center;gap:4px;}
+.vdisp{width:68px;text-align:center;color:var(--txt);font-size:14px;font-weight:700;}
+.circ{width:32px;height:32px;border-radius:50%;border:2px solid #3949ab;
+  color:#3949ab;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  background:transparent;font-size:18px;font-weight:700;line-height:1;}
+[data-theme="dark"] .circ{border-color:var(--gold);color:var(--gold);}
+.circ:disabled{opacity:.3;cursor:default;}
+.sdiv{height:1px;background:var(--border);margin:0 14px;}
+.swrow{display:flex;align-items:center;padding:9px 14px;}
+.swrow label{flex:1;color:var(--txt);font-size:13px;}
+.sw{width:44px;height:25px;border-radius:13px;border:none;cursor:pointer;
+  position:relative;transition:background .2s;flex-shrink:0;}
+.sw::after{content:'';position:absolute;top:4px;width:17px;height:17px;
+  border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.3);}
+.sw.off{background:rgba(0,0,0,.2)}.sw.off::after{left:3px}
+.sw.on{background:#3949ab}.sw.on::after{left:23px}
+[data-theme="dark"] .sw.on{background:var(--gold)}
+.prev-box{background:rgba(57,73,171,.08);border-radius:10px;
+  border:1px solid rgba(57,73,171,.25);padding:12px;margin-bottom:4px;}
+[data-theme="dark"] .prev-box{background:rgba(255,215,0,.07);border-color:rgba(255,215,0,.25);}
+.prev-box .pt{color:#3949ab;font-size:12px;font-weight:700;margin-bottom:6px;}
+[data-theme="dark"] .prev-box .pt{color:var(--gold);}
+.pr{display:flex;gap:4px;font-size:12px;margin-bottom:2px;}
+.pr .pl{color:var(--txt2)}.pr .pv{color:var(--txt);font-weight:700;}
 </style>
 </head>
 <body>
 
 <!-- ヘッダー -->
-<div id="header">
-  <button id="settings-btn" onclick="openSettings()" title="設定">
+<div id="hdr">
+  <button id="settings-btn" onclick="openSettings()">
     <svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+    設定
   </button>
-  <span id="status-badge">待機中</span>
-  <div class="spacer"></div>
-  <div id="timer-display">00:00</div>
-  <div class="spacer"></div>
-  <div id="result-badge">－</div>
+  <span class="hbadge" id="status-badge">待機中</span>
+  <div id="hdr-r"><div id="result-badge">－</div></div>
 </div>
 
-<!-- メインエリア -->
+<!-- 大タイマー -->
+<div id="timer-row"><div id="timer">02:00</div></div>
+
+<!-- メイン：白(左) | 赤(右) -->
 <div id="main">
-  <!-- 赤パネル -->
+  <div class="panel shiro" id="panel-shiro">
+    <div class="phdr">白</div>
+    <div class="scores" id="scores-shiro"></div>
+  </div>
+  <div class="divider"></div>
   <div class="panel aka" id="panel-aka">
-    <div class="panel-header">赤</div>
+    <div class="phdr">赤</div>
     <div class="scores" id="scores-aka"></div>
   </div>
-  <div class="divider-v"></div>
-  <div class="divider-h"></div>
-  <!-- 白パネル -->
-  <div class="panel shiro" id="panel-shiro">
-    <div class="panel-header">白</div>
-    <div class="scores" id="scores-shiro"></div>
+</div>
+<!-- 抑え込み中ポップアップ（スコアエリア中央・全パネル横断） -->
+<div id="osae-global-popup" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;
+  pointer-events:none;z-index:40;display:flex;align-items:center;justify-content:center;">
+  <div id="osae-popup-inner" style="background:rgba(0,0,0,.78);color:#fff;border-radius:18px;
+    padding:12px 28px;text-align:center;
+    display:flex;flex-direction:column;align-items:center;gap:3px;
+    backdrop-filter:blur(6px);box-shadow:0 4px 24px rgba(0,0,0,.4);">
+    <div id="opp-num" style="font-size:clamp(50px,12vw,90px);font-weight:900;line-height:1;
+      font-variant-numeric:tabular-nums;"></div>
+    <div id="opp-lbl" style="font-size:clamp(13px,2.2vw,20px);font-weight:700;opacity:.85;">秒</div>
+    <div id="opp-state" style="font-size:clamp(12px,2vw,18px);font-weight:800;margin-top:2px;"></div>
   </div>
 </div>
 
 <!-- フッター -->
 <div id="footer">
-  <button class="ctrl-btn" id="btn-main" onclick="handleMainBtn()">▶ 開始</button>
-  <button class="ctrl-btn" id="btn-undo" onclick="handleUndo()" style="border-color:#7e57c2;color:#7e57c2" disabled>↩ 戻す</button>
-  <button class="ctrl-btn" onclick="confirmReset()" style="border-color:#ff5722;color:#ff5722">↺ リセット</button>
+  <button class="foot-btn" id="btn-invalid" onclick="handleInvalid()"
+    style="border-color:rgba(255,255,255,.4)" disabled>✕ 無効</button>
+  <button id="btn-main" onclick="handleMainBtn()">▶ 開始</button>
+  <button class="foot-btn" onclick="confirmReset()"
+    style="border-color:rgba(255,255,255,.4)">↺ リセット</button>
 </div>
 
-<!-- リセット確認モーダル -->
-<div class="modal-overlay hidden" id="reset-modal">
+<!-- リセット確認 -->
+<div class="modal-ov hidden" id="reset-modal">
   <div class="modal">
     <h2>⚠️ リセット確認</h2>
-    <p style="color:rgba(255,255,255,.7);font-size:14px;line-height:1.6">試合データをすべてリセットしますか？<br>この操作は取り消せません。</p>
-    <div class="modal-actions">
+    <p style="font-size:14px;line-height:1.7;color:var(--txt2)">
+      試合データをすべてリセットしますか？<br>この操作は取り消せません。</p>
+    <div class="mact">
       <button class="btn-cancel" onclick="closeModal('reset-modal')">キャンセル</button>
-      <button class="btn-ok" style="background:#ff5722" onclick="doReset()">リセット</button>
+      <button class="btn-ok" style="background:#c62828" onclick="doReset()">リセット</button>
     </div>
   </div>
 </div>
 
-<!-- 設定モーダル -->
-<div class="modal-overlay hidden" id="settings-modal">
+<!-- 無効確認 -->
+<div class="modal-ov hidden" id="invalid-modal">
+  <div class="modal">
+    <h2>✕ 無効（取り消し）</h2>
+    <div id="inv-preview" style="background:rgba(0,0,0,.06);border-radius:8px;
+      padding:10px;font-size:13px;line-height:1.9;color:var(--txt);min-height:36px;"></div>
+    <div class="mact">
+      <button class="btn-cancel" onclick="closeModal('invalid-modal')">キャンセル</button>
+      <button class="btn-ok" style="background:#c62828" onclick="doInvalid()">無効にする</button>
+    </div>
+  </div>
+</div>
+
+<!-- 設定 -->
+<div class="modal-ov hidden" id="settings-modal">
   <div class="modal">
     <h2>⚙️ 設定</h2>
-    <div class="setting-section">
-      <div class="setting-section-title">⏱️ 試合時間</div>
-      <div class="setting-row">
+    <!-- テーマ切替 -->
+    <div class="ss">
+      <div class="ss-title">🎨 表示テーマ</div>
+      <div class="swrow">
+        <label>ダークモード</label>
+        <button class="sw off" id="sw-dark" onclick="toggleDark()"></button>
+      </div>
+    </div>
+    <div class="ss">
+      <div class="ss-title">⏱️ 試合時間</div>
+      <div class="srow">
         <label>試合時間</label>
-        <div class="val-ctrl">
-          <button class="circ" style="border-color:#ffd700;color:#ffd700" onclick="adjSetting('matchDur',-30)">
-            <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          </button>
-          <div class="val-display" id="disp-matchDur">4分</div>
-          <button class="circ" style="border-color:#ffd700;color:#ffd700" onclick="adjSetting('matchDur',30)">
-            <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          </button>
+        <div class="vctrl">
+          <button class="circ" onclick="adjS('matchDur',-30)">－</button>
+          <div class="vdisp" id="disp-matchDur">2分</div>
+          <button class="circ" onclick="adjS('matchDur',30)">＋</button>
         </div>
       </div>
     </div>
-    <div class="setting-section">
-      <div class="setting-section-title">🔒 抑え込み</div>
-      <div class="setting-row">
+    <div class="ss">
+      <div class="ss-title">🔒 抑え込み</div>
+      <div class="srow">
         <label>技あり（秒）</label>
-        <div class="val-ctrl">
-          <button class="circ" style="border-color:#ffd700;color:#ffd700" onclick="adjSetting('osaeWazaari',-1)">
-            <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          </button>
-          <div class="val-display" id="disp-osaeWazaari">10秒</div>
-          <button class="circ" style="border-color:#ffd700;color:#ffd700" onclick="adjSetting('osaeWazaari',1)">
-            <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          </button>
+        <div class="vctrl">
+          <button class="circ" onclick="adjS('osaeWazaari',-1)">－</button>
+          <div class="vdisp" id="disp-osaeWazaari">10秒</div>
+          <button class="circ" onclick="adjS('osaeWazaari',1)">＋</button>
         </div>
       </div>
-      <div class="setting-divider"></div>
-      <div class="setting-row">
+      <div class="sdiv"></div>
+      <div class="srow">
         <label>一本（秒）</label>
-        <div class="val-ctrl">
-          <button class="circ" style="border-color:#ffd700;color:#ffd700" onclick="adjSetting('osaeMax',-1)">
-            <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          </button>
-          <div class="val-display" id="disp-osaeMax">20秒</div>
-          <button class="circ" style="border-color:#ffd700;color:#ffd700" onclick="adjSetting('osaeMax',1)">
-            <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          </button>
+        <div class="vctrl">
+          <button class="circ" onclick="adjS('osaeMax',-1)">－</button>
+          <div class="vdisp" id="disp-osaeMax">20秒</div>
+          <button class="circ" onclick="adjS('osaeMax',1)">＋</button>
         </div>
       </div>
     </div>
-    <div class="setting-section">
-      <div class="setting-section-title">🟡 指導</div>
-      <div class="switch-row">
+    <div class="ss">
+      <div class="ss-title">🟡 指導</div>
+      <div class="swrow">
         <label>指導による勝敗判定</label>
-        <button class="switch on" id="switch-shido" onclick="toggleShido()"></button>
+        <button class="sw on" id="sw-shido" onclick="toggleShido()"></button>
       </div>
-      <div class="setting-divider"></div>
-      <div class="setting-row" id="shido-count-row">
+      <div class="sdiv"></div>
+      <div class="srow" id="shido-count-row">
         <label>何回で負け</label>
-        <div class="val-ctrl">
-          <button class="circ" style="border-color:#ffd700;color:#ffd700" onclick="adjSetting('shidoLim',-1)">
-            <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          </button>
-          <div class="val-display" id="disp-shidoLim">3回</div>
-          <button class="circ" style="border-color:#ffd700;color:#ffd700" onclick="adjSetting('shidoLim',1)">
-            <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          </button>
+        <div class="vctrl">
+          <button class="circ" onclick="adjS('shidoLim',-1)">－</button>
+          <div class="vdisp" id="disp-shidoLim">3回</div>
+          <button class="circ" onclick="adjS('shidoLim',1)">＋</button>
         </div>
       </div>
     </div>
-
-    <div class="preview-box">
-      <div class="preview-title">📋 設定プレビュー</div>
-      <div class="preview-row"><span class="pl">試合時間：</span><span class="pv" id="prev-matchDur"></span></div>
-      <div class="preview-row"><span class="pl">抑え込み技あり：</span><span class="pv" id="prev-osaeWazaari"></span></div>
-      <div class="preview-row"><span class="pl">抑え込み一本：</span><span class="pv" id="prev-osaeMax"></span></div>
-      <div class="preview-row"><span class="pl">指導判定：</span><span class="pv" id="prev-shido"></span></div>
+    <div class="prev-box">
+      <div class="pt">📋 設定プレビュー</div>
+      <div class="pr"><span class="pl">試合時間：</span><span class="pv" id="prev-matchDur"></span></div>
+      <div class="pr"><span class="pl">技あり：</span><span class="pv" id="prev-osaeWazaari"></span></div>
+      <div class="pr"><span class="pl">一本：</span><span class="pv" id="prev-osaeMax"></span></div>
+      <div class="pr"><span class="pl">指導判定：</span><span class="pv" id="prev-shido"></span></div>
     </div>
-    <div class="modal-actions">
+    <div class="mact">
       <button class="btn-cancel" onclick="closeModal('settings-modal')">キャンセル</button>
-      <button class="btn-ok" style="background:#ffd700;color:#000" onclick="saveSettings()">保存</button>
+      <button class="btn-ok" style="background:#3949ab;color:#fff" onclick="saveSettings()">保存</button>
     </div>
   </div>
 </div>
 
-
 <script>
-// ─── 状態 ───────────────────────────────────────────────────────────
-const S = {
-  settings: { matchDur: 240, osaeWazaari: 10, osaeMax: 20, shidoEnabled: true, shidoLim: 3 },
-  aka: { ippon:0, wazaari:0, yuko:0, shido:0, osaeKomiSecs:0 },
-  shiro: { ippon:0, wazaari:0, yuko:0, shido:0, osaeKomiSecs:0 },
-  status: 'idle', // idle | running | paused | finished
-  remaining: 240,
-  osaeSide: null, // null | 'aka' | 'shiro'
-  osaeRunning: false,
-  history: [],
-  endSoundSrc: ''
+// ══ 状態 ═════════════════════════════════════════
+const S={
+  cfg:{matchDur:120,osaeWazaari:10,osaeMax:20,shidoEnabled:true,shidoLim:3,dark:false},
+  aka:  {ippon:0,wazaari:0,yuko:0,shido:0,osaeSecs:0},
+  shiro:{ippon:0,wazaari:0,yuko:0,shido:0,osaeSecs:0},
+  status:'idle',remaining:120,
+  osaeSide:null,osaeOn:false,
+  history:[],pending:null,
 };
+let mTmr=null,oTmr=null;
+const MXH=20;
 
-let matchTimer = null;
-let osaeTimer = null;
-const MAX_HISTORY = 20;
-
-// ─── スナップショット ────────────────────────────────────────────────
-function snapshot() {
-  return {
-    aka: {...S.aka},
-    shiro: {...S.shiro},
-    status: S.status,
-    remaining: S.remaining,
-    osaeSide: S.osaeSide,
-    osaeRunning: S.osaeRunning
-  };
+// ── スナップショット ──────────────────────────────
+function snap(){
+  return{aka:{...S.aka},shiro:{...S.shiro},
+    status:S.status,remaining:S.remaining,
+    osaeSide:S.osaeSide,osaeOn:S.osaeOn};
 }
-function pushHistory() {
-  S.history.push(snapshot());
-  if (S.history.length > MAX_HISTORY) S.history.shift();
-}
+function pushH(){S.history.push(snap());if(S.history.length>MXH)S.history.shift();}
 
-// ─── 勝敗判定 ────────────────────────────────────────────────────────
-function getResult() {
-  const a = S.aka, w = S.shiro, cfg = S.settings;
-  if (a.ippon >= 1 && w.ippon < 1) return 'aka';
-  if (w.ippon >= 1 && a.ippon < 1) return 'shiro';
-  if (a.wazaari >= 2 && w.wazaari < 2) return 'aka';
-  if (w.wazaari >= 2 && a.wazaari < 2) return 'shiro';
-  if (cfg.shidoEnabled) {
-    if (a.shido >= cfg.shidoLim && w.shido < cfg.shidoLim) return 'shiro';
-    if (w.shido >= cfg.shidoLim && a.shido < cfg.shidoLim) return 'aka';
+// ── 勝敗 ─────────────────────────────────────────
+function getResult(){
+  const a=S.aka,w=S.shiro,c=S.cfg;
+  if(a.ippon>=1&&w.ippon<1)return'aka';if(w.ippon>=1&&a.ippon<1)return'shiro';
+  if(a.wazaari>=2&&w.wazaari<2)return'aka';if(w.wazaari>=2&&a.wazaari<2)return'shiro';
+  if(c.shidoEnabled){
+    if(a.shido>=c.shidoLim&&w.shido<c.shidoLim)return'shiro';
+    if(w.shido>=c.shidoLim&&a.shido<c.shidoLim)return'aka';
   }
-  if (a.wazaari > w.wazaari) return 'aka';
-  if (w.wazaari > a.wazaari) return 'shiro';
-  if (a.yuko > w.yuko) return 'aka';
-  if (w.yuko > a.yuko) return 'shiro';
-  return 'draw';
+  if(a.wazaari>w.wazaari)return'aka';if(w.wazaari>a.wazaari)return'shiro';
+  if(a.yuko>w.yuko)return'aka';if(w.yuko>a.yuko)return'shiro';
+  return'draw';
 }
-function isDecided() {
-  const a = S.aka, w = S.shiro, cfg = S.settings;
-  if (a.ippon >= 1 || w.ippon >= 1) return true;
-  if (a.wazaari >= 2 || w.wazaari >= 2) return true;
-  if (cfg.shidoEnabled && (a.shido >= cfg.shidoLim || w.shido >= cfg.shidoLim)) return true;
+function decided(){
+  const a=S.aka,w=S.shiro,c=S.cfg;
+  if(a.ippon>=1||w.ippon>=1)return true;
+  if(a.wazaari>=2||w.wazaari>=2)return true;
+  if(c.shidoEnabled&&(a.shido>=c.shidoLim||w.shido>=c.shidoLim))return true;
   return false;
 }
 
-// ─── タイマー ────────────────────────────────────────────────────────
-function startMatchTimer() {
-  clearInterval(matchTimer);
-  matchTimer = setInterval(() => {
-    if (S.remaining > 0) {
-      S.remaining--;
-      render();
-      if (isDecided()) finishMatch(false);
-    } else {
-      finishMatch(true);
-    }
-  }, 1000);
+// ── タイマー ─────────────────────────────────────
+function startMTmr(){
+  clearInterval(mTmr);
+  mTmr=setInterval(()=>{
+    if(S.remaining>0){S.remaining--;render();if(decided())finish(false);}
+    else finish(true);
+  },1000);
+}
+function startMatch(){
+  if(S.status==='finished')return;
+  if(S.status==='idle'){S.remaining=S.cfg.matchDur;beepStart();}
+  S.status='running';startMTmr();render();
+}
+function pauseMatch(){
+  clearInterval(mTmr);
+  if(S.osaeOn){clearInterval(oTmr);S.osaeOn=false;}
+  S.status='paused';render();
+}
+function finish(timeUp){
+  clearInterval(mTmr);clearInterval(oTmr);
+  S.osaeOn=false;S.osaeSide=null;
+  S.status='finished';
+  beepEnd();
+  render();
+}
+function handleMainBtn(){
+  if(S.status==='idle'||S.status==='paused')startMatch();
+  else if(S.status==='running')pauseMatch();
 }
 
-function startMatch() {
-  if (S.status === 'finished') return;
-  if (S.status === 'idle') {
-    S.remaining = S.settings.matchDur;
-    playStartSound();
+// ── スコア操作 ────────────────────────────────────
+function addScore(side,field){
+  pushH();
+  const p=S[side],c=S.cfg;
+  if(field==='ippon')   p.ippon  =Math.min(1,p.ippon+1);
+  if(field==='wazaari') p.wazaari=Math.min(2,p.wazaari+1);
+  if(field==='yuko')    p.yuko++;
+  if(field==='shido')   p.shido  =Math.min(c.shidoLim,p.shido+1);
+  if(decided()&&S.status==='running')finish(false);
+  render();
+}
+function subScore(side,field,e){
+  e&&e.stopPropagation();
+  pushH();
+  const p=S[side];
+  if(field==='ippon')   p.ippon  =Math.max(0,p.ippon-1);
+  if(field==='wazaari') p.wazaari=Math.max(0,p.wazaari-1);
+  if(field==='yuko')    p.yuko   =Math.max(0,p.yuko-1);
+  if(field==='shido')   p.shido  =Math.max(0,p.shido-1);
+  render();
+}
+
+// ── 無効（アンドゥ）──────────────────────────────
+function handleInvalid(){
+  if(!S.history.length){alert('戻せる操作がありません');return;}
+  S.pending=S.history[S.history.length-1];
+  const prev=S.pending;
+  const lines=[];
+  let ipponChanged=false;
+  for(const side of['aka','shiro']){
+    const lbl=side==='aka'?'赤':'白';
+    const cur=S[side],pre=prev[side];
+    if(cur.ippon!==pre.ippon){lines.push(`${lbl} 一本: ${cur.ippon}→${pre.ippon}`);ipponChanged=true;}
+    if(cur.wazaari!==pre.wazaari)lines.push(`${lbl} 技あり: ${cur.wazaari}→${pre.wazaari}`);
+    if(cur.yuko!==pre.yuko)    lines.push(`${lbl} 有効: ${cur.yuko}→${pre.yuko}`);
+    if(cur.shido!==pre.shido)  lines.push(`${lbl} 指導: ${cur.shido}→${pre.shido}`);
+    if(cur.osaeSecs!==pre.osaeSecs)lines.push(`${lbl} 抑え込み: ${cur.osaeSecs}秒→${pre.osaeSecs}秒`);
   }
-  S.status = 'running';
-  startMatchTimer();
-  render();
-}
-
-function pauseMatch() {
-  clearInterval(matchTimer);
-  if (S.osaeRunning) { clearInterval(osaeTimer); S.osaeRunning = false; }
-  S.status = 'paused';
-  render();
-}
-
-function finishMatch(timeUp) {
-  clearInterval(matchTimer);
-  clearInterval(osaeTimer);
-  S.osaeRunning = false;
-  S.osaeSide = null;
-  S.status = 'finished';
-  if (timeUp) playEndSound();
-  render();
-}
-
-function handleMainBtn() {
-  if (S.status === 'idle' || S.status === 'paused') startMatch();
-  else if (S.status === 'running') pauseMatch();
-}
-
-// ─── アンドゥ ────────────────────────────────────────────────────────
-function handleUndo() {
-  if (!S.history.length) return;
-  clearInterval(matchTimer);
-  clearInterval(osaeTimer);
-  const snap = S.history.pop();
-  S.aka = {...snap.aka};
-  S.shiro = {...snap.shiro};
-  S.remaining = snap.remaining;
-  S.osaeSide = snap.osaeSide;
-
-  // finished → running として復元
-  const restoredStatus = snap.status === 'finished' ? 'running' : snap.status;
-  S.status = restoredStatus;
-
-  // 試合タイマー復元
-  if (restoredStatus === 'running') startMatchTimer();
-
-  // 抑え込みタイマー復元
-  if (snap.osaeRunning && snap.osaeSide) {
-    S.osaeRunning = true;
-    startOsaeTimer(snap.osaeSide);
+  if(ipponChanged){
+    lines.push(`⏱ 時間も戻します: ${fmtT(S.remaining)}→${fmtT(prev.remaining)}`);
   } else {
-    S.osaeRunning = false;
+    lines.push(`⏱ 時間はそのまま継続（現在: ${fmtT(S.remaining)}）`);
   }
-  render();
+  document.getElementById('inv-preview').innerHTML=lines.map(l=>`・${l}`).join('<br>');
+  document.getElementById('invalid-modal').classList.remove('hidden');
 }
-
-// ─── リセット ────────────────────────────────────────────────────────
-function confirmReset() { document.getElementById('reset-modal').classList.remove('hidden'); }
-function doReset() {
-  clearInterval(matchTimer); clearInterval(osaeTimer);
-  S.aka = {ippon:0,wazaari:0,yuko:0,shido:0,osaeKomiSecs:0};
-  S.shiro = {ippon:0,wazaari:0,yuko:0,shido:0,osaeKomiSecs:0};
-  S.status = 'idle';
-  S.remaining = S.settings.matchDur;
-  S.osaeSide = null; S.osaeRunning = false;
-  S.history = [];
-  closeModal('reset-modal');
-  render();
-}
-
-// ─── スコア変更 ───────────────────────────────────────────────────────
-function changeScore(side, field, delta) {
-  pushHistory();
-  const p = S[side];
-  const cfg = S.settings;
-  if (field === 'ippon')   p.ippon   = Math.max(0, Math.min(1, p.ippon + delta));
-  if (field === 'wazaari') p.wazaari = Math.max(0, Math.min(2, p.wazaari + delta));
-  if (field === 'yuko')    p.yuko    = Math.max(0, p.yuko + delta);
-  if (field === 'shido')   p.shido   = Math.max(0, Math.min(cfg.shidoLim, p.shido + delta));
-  if (isDecided() && S.status === 'running') finishMatch(false);
-  render();
-}
-
-// ─── 抑え込み ────────────────────────────────────────────────────────
-function startOsaeTimer(side) {
-  clearInterval(osaeTimer);
-  osaeTimer = setInterval(() => {
-    const p = S[side];
-    p.osaeKomiSecs++;
-    const cfg = S.settings;
-    // 技あり付与（まだ2未満のとき、閾値到達した瞬間のみ）
-    if (p.osaeKomiSecs === cfg.osaeWazaari && p.wazaari < 2) {
-      pushHistory();
-      p.wazaari = Math.min(2, p.wazaari + 1);
-    }
-    render();
-    // 一本付与
-    if (p.osaeKomiSecs >= cfg.osaeMax) {
-      clearInterval(osaeTimer);
-      S.osaeRunning = false;
-      S.osaeSide = null;
-      pushHistory();
-      S[side].ippon = Math.min(1, S[side].ippon + 1);
-      finishMatch(false);
-      return;
-    }
-    if (isDecided() && S.status === 'running') finishMatch(false);
-  }, 1000);
-}
-
-function handleOsaeStart(side) {
-  if (S.osaeRunning && S.osaeSide === side) {
-    // 一時停止
-    clearInterval(osaeTimer);
-    S.osaeRunning = false;
-    render();
+function doInvalid(){
+  if(!S.pending)return;
+  const prev=S.history.pop();
+  let ipponChanged=false;
+  for(const side of['aka','shiro'])
+    if(S[side].ippon!==prev[side].ippon)ipponChanged=true;
+  S.aka={...prev.aka};S.shiro={...prev.shiro};
+  S.osaeSide=prev.osaeSide;
+  if(ipponChanged){
+    clearInterval(mTmr);clearInterval(oTmr);
+    S.remaining=prev.remaining;
+    const st=prev.status==='finished'?'running':prev.status;
+    S.status=st;
+    if(st==='running')startMTmr();
+    if(prev.osaeOn&&prev.osaeSide){S.osaeOn=true;startOTmr(prev.osaeSide);}
+    else S.osaeOn=false;
   } else {
-    // 開始（他サイドが動いていたらリセット）
-    if (S.osaeSide && S.osaeSide !== side) {
-      S[S.osaeSide].osaeKomiSecs = 0;
-    }
-    S.osaeSide = side;
-    S.osaeRunning = true;
-    if (S.status !== 'running') startMatch();
-    startOsaeTimer(side);
+    S.osaeOn=prev.osaeOn;
+  }
+  S.pending=null;
+  closeModal('invalid-modal');render();
+}
+
+// ── リセット ──────────────────────────────────────
+function confirmReset(){document.getElementById('reset-modal').classList.remove('hidden');}
+function doReset(){
+  clearInterval(mTmr);clearInterval(oTmr);
+  S.aka={ippon:0,wazaari:0,yuko:0,shido:0,osaeSecs:0};
+  S.shiro={ippon:0,wazaari:0,yuko:0,shido:0,osaeSecs:0};
+  S.status='idle';S.remaining=S.cfg.matchDur;
+  S.osaeSide=null;S.osaeOn=false;S.history=[];
+  closeModal('reset-modal');render();
+}
+
+// ── 抑え込み ──────────────────────────────────────
+function startOTmr(side){
+  clearInterval(oTmr);
+  oTmr=setInterval(()=>{
+    const p=S[side];p.osaeSecs++;
+    const c=S.cfg;
+    if(p.osaeSecs===c.osaeWazaari&&p.wazaari<2){pushH();p.wazaari=Math.min(2,p.wazaari+1);}
     render();
-  }
-}
-
-function handleOsaeRelease(side) {
-  pushHistory();
-  clearInterval(osaeTimer);
-  S.osaeSide = null;
-  S.osaeRunning = false;
-  S[side].osaeKomiSecs = 0;
-  render();
-}
-
-// ─── Web Audio ───────────────────────────────────────────────────────
-const _ac = new (window.AudioContext || window.webkitAudioContext)();
-
-function _beep(freq, duration, startTime, vol) {
-  const g = _ac.createGain();
-  g.gain.setValueAtTime(vol, startTime);
-  g.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
-  const o = _ac.createOscillator();
-  o.type = 'square';
-  o.frequency.setValueAtTime(freq, startTime);
-  o.connect(g); g.connect(_ac.destination);
-  o.start(startTime); o.stop(startTime + duration + 0.01);
-}
-
-// 開始音：880Hz・1.5秒の単音ピーーー
-function playStartSound() {
-  if (_ac.state === 'suspended') _ac.resume();
-  _beep(880, 1.5, _ac.currentTime, 1.0);
-}
-
-// 終了音：880Hz・0.1秒×4連打→0.3秒休み を3セット
-function playEndSound() {
-  if (_ac.state === 'suspended') _ac.resume();
-  const t0 = _ac.currentTime;
-  for (let set = 0; set < 3; set++) {
-    const base = t0 + set * (4 * 0.1 + 0.3); // 1セット = 0.4+0.3 = 0.7秒
-    for (let i = 0; i < 4; i++) {
-      _beep(880, 0.1, base + i * 0.1, 1.0);
+    if(p.osaeSecs>=c.osaeMax){
+      clearInterval(oTmr);S.osaeOn=false;S.osaeSide=null;
+      pushH();S[side].ippon=Math.min(1,S[side].ippon+1);
+      finish(false);return;
     }
-  }
+    if(decided()&&S.status==='running')finish(false);
+  },1000);
+}
+function osaeStart(side){
+  if(S.osaeOn&&S.osaeSide===side){clearInterval(oTmr);S.osaeOn=false;render();return;}
+  if(S.osaeSide&&S.osaeSide!==side)S[S.osaeSide].osaeSecs=0;
+  S.osaeSide=side;S.osaeOn=true;
+  if(S.status!=='running')startMatch();
+  startOTmr(side);render();
+}
+function osaeRelease(side){
+  pushH();clearInterval(oTmr);
+  S.osaeSide=null;S.osaeOn=false;S[side].osaeSecs=0;render();
 }
 
-// ─── 設定 ────────────────────────────────────────────────────────────
-let tmpSettings = {};
-function openSettings() {
-  tmpSettings = {...S.settings};
-  updateSettingsUI();
-  document.getElementById('settings-modal').classList.remove('hidden');
+// ── 音 ───────────────────────────────────────────
+let _ac;
+function gAC(){if(!_ac)_ac=new(window.AudioContext||window.webkitAudioContext)();return _ac;}
+function _beep(f,d,t,v=1){
+  const ac=gAC(),g=ac.createGain(),o=ac.createOscillator();
+  g.gain.setValueAtTime(v,t);
+  g.gain.setValueAtTime(v,t+d-0.05);  // 最後まで音量を保持
+  g.gain.exponentialRampToValueAtTime(0.001,t+d+0.02);
+  o.type='square';o.frequency.setValueAtTime(f,t);
+  o.connect(g);g.connect(ac.destination);o.start(t);o.stop(t+d+0.05);
 }
-function adjSetting(key, delta) {
-  if (key === 'matchDur')  tmpSettings.matchDur  = Math.max(60, Math.min(600, tmpSettings.matchDur + delta));
-  if (key === 'osaeWazaari') tmpSettings.osaeWazaari = Math.max(1, Math.min(59, tmpSettings.osaeWazaari + delta));
-  if (key === 'osaeMax')   tmpSettings.osaeMax   = Math.max(5, Math.min(60, tmpSettings.osaeMax + delta));
-  if (key === 'shidoLim')  tmpSettings.shidoLim  = Math.max(1, Math.min(5, tmpSettings.shidoLim + delta));
-  updateSettingsUI();
+// 開始音：880Hz 2.5秒、同じ高さのまま伸ばす
+function beepStart(){
+  const ac=gAC();if(ac.state==='suspended')ac.resume();
+  _beep(880,2.5,ac.currentTime,1);
 }
-function toggleShido() {
-  tmpSettings.shidoEnabled = !tmpSettings.shidoEnabled;
-  updateSettingsUI();
-}
-function updateSettingsUI() {
-  const t = tmpSettings;
-  const m = t.matchDur;
-  document.getElementById('disp-matchDur').textContent =
-    m % 60 === 0 ? `${m/60}分` : `${Math.floor(m/60)}分${m%60}秒`;
-  document.getElementById('disp-osaeWazaari').textContent = t.osaeWazaari + '秒';
-  document.getElementById('disp-osaeMax').textContent = t.osaeMax + '秒';
-  document.getElementById('disp-shidoLim').textContent = t.shidoLim + '回';
-  const sw = document.getElementById('switch-shido');
-  sw.className = 'switch ' + (t.shidoEnabled ? 'on' : 'off');
-  document.getElementById('shido-count-row').style.display = t.shidoEnabled ? '' : 'none';
-  document.getElementById('prev-matchDur').textContent =
-    m % 60 === 0 ? `${m/60}分` : `${Math.floor(m/60)}分${m%60}秒`;
-  document.getElementById('prev-osaeWazaari').textContent = t.osaeWazaari + '秒';
-  document.getElementById('prev-osaeMax').textContent = t.osaeMax + '秒';
-  document.getElementById('prev-shido').textContent =
-    t.shidoEnabled ? `${t.shidoLim}回で負け` : '無効';
-}
-function saveSettings() {
-  S.settings = {...tmpSettings};
-  if (S.status === 'idle') S.remaining = S.settings.matchDur;
-  closeModal('settings-modal');
-  render();
-}
-function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
-
-// ─── 描画 ────────────────────────────────────────────────────────────
-function fmtTime(s) {
-  return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+// 終了・一本音：880Hz 0.1秒×4連打→0.3秒休み を3セット
+function beepEnd(){
+  const ac=gAC();if(ac.state==='suspended')ac.resume();
+  const t0=ac.currentTime;
+  for(let s=0;s<3;s++){const b=t0+s*0.7;for(let i=0;i<4;i++)_beep(880,0.09,b+i*0.1,1);}
 }
 
-function render() {
-  renderHeader();
-  renderPanel('aka');
-  renderPanel('shiro');
-  renderFooter();
+// ── テーマ ────────────────────────────────────────
+let tmpDark=false;
+function toggleDark(){
+  tmpDark=!tmpDark;
+  document.getElementById('sw-dark').className='sw '+(tmpDark?'on':'off');
+}
+function applyTheme(dark){
+  document.documentElement.setAttribute('data-theme',dark?'dark':'light');
 }
 
-function renderHeader() {
-  const timerEl = document.getElementById('timer-display');
-  const isLow = S.remaining <= 30 && S.status === 'running';
-  timerEl.textContent = fmtTime(S.remaining);
-  timerEl.style.color = isLow ? '#ff6b7a' : '#fff';
-  timerEl.style.borderColor = isLow ? '#cc2936' : 'rgba(255,255,255,.24)';
-  timerEl.style.background = isLow ? 'rgba(204,41,54,.15)' : 'rgba(255,255,255,.06)';
-  timerEl.style.borderWidth = isLow ? '2px' : '1px';
+// ── 設定 ─────────────────────────────────────────
+let tmp={};
+function openSettings(){
+  tmp={...S.cfg};tmpDark=S.cfg.dark;
+  document.getElementById('sw-dark').className='sw '+(tmpDark?'on':'off');
+  updUI();document.getElementById('settings-modal').classList.remove('hidden');
+}
+function adjS(k,d){
+  if(k==='matchDur')    tmp.matchDur   =Math.max(60,Math.min(600,tmp.matchDur+d));
+  if(k==='osaeWazaari') tmp.osaeWazaari=Math.max(1,Math.min(59,tmp.osaeWazaari+d));
+  if(k==='osaeMax')     tmp.osaeMax    =Math.max(5,Math.min(60,tmp.osaeMax+d));
+  if(k==='shidoLim')    tmp.shidoLim   =Math.max(1,Math.min(5,tmp.shidoLim+d));
+  updUI();
+}
+function toggleShido(){tmp.shidoEnabled=!tmp.shidoEnabled;updUI();}
+function updUI(){
+  const t=tmp,m=t.matchDur;
+  const ms=m%60===0?`${m/60}分`:`${Math.floor(m/60)}分${m%60}秒`;
+  document.getElementById('disp-matchDur').textContent=ms;
+  document.getElementById('disp-osaeWazaari').textContent=t.osaeWazaari+'秒';
+  document.getElementById('disp-osaeMax').textContent=t.osaeMax+'秒';
+  document.getElementById('disp-shidoLim').textContent=t.shidoLim+'回';
+  document.getElementById('sw-shido').className='sw '+(t.shidoEnabled?'on':'off');
+  document.getElementById('shido-count-row').style.display=t.shidoEnabled?'':'none';
+  document.getElementById('prev-matchDur').textContent=ms;
+  document.getElementById('prev-osaeWazaari').textContent=t.osaeWazaari+'秒';
+  document.getElementById('prev-osaeMax').textContent=t.osaeMax+'秒';
+  document.getElementById('prev-shido').textContent=t.shidoEnabled?`${t.shidoLim}回で負け`:'無効';
+}
+function saveSettings(){
+  tmp.dark=tmpDark;
+  S.cfg={...tmp};
+  if(S.status==='idle')S.remaining=S.cfg.matchDur;
+  applyTheme(S.cfg.dark);
+  closeModal('settings-modal');render();
+}
+function closeModal(id){document.getElementById(id).classList.add('hidden');}
 
-  const badge = document.getElementById('status-badge');
-  const statusMap = {idle:['待機中','rgba(255,255,255,.38)'],running:['試合中','#4caf50'],paused:['停止中','#ffd700'],finished:['終　了','#ff5722']};
-  const [txt, clr] = statusMap[S.status];
-  badge.textContent = txt;
-  badge.style.color = clr;
-  badge.style.borderColor = clr + '80';
-  badge.style.background = clr + '20';
+// ── 描画 ─────────────────────────────────────────
+function fmtT(s){return`${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;}
 
-  const res = getResult();
-  const rb = document.getElementById('result-badge');
-  const resMap = {aka:['赤 勝ち','#cc2936'],shiro:['白 勝ち','#ddd'],draw:['引き分け','#ffd700'],draw2:['引き分け','#ffd700']};
-  if (res === 'draw') {
-    rb.textContent = '引き分け';
-    rb.style.color = '#ffd700'; rb.style.borderColor = '#ffd70060'; rb.style.background = '#ffd70018';
-  } else if (res === 'aka' || res === 'shiro') {
-    const [t,c] = resMap[res];
-    rb.textContent = t;
-    rb.style.color = c; rb.style.borderColor = c+'60'; rb.style.background = c+'18';
-  } else {
-    rb.textContent = '－';
-    rb.style.color = 'rgba(255,255,255,.24)'; rb.style.borderColor = 'rgba(255,255,255,.24)'; rb.style.background = 'transparent';
-  }
+function render(){renderHdr();renderPanel('shiro');renderPanel('aka');renderFooter();renderOsaePopup();}
+
+function renderOsaePopup(){
+  const pop=document.getElementById('osae-global-popup');
+  if(!S.osaeSide||!S.osaeOn){pop.style.display='none';return;}
+  const p=S[S.osaeSide];
+  const c=S.cfg;
+  const secs=p.osaeSecs;
+  const barC=secs<c.osaeWazaari?'#4caf50':secs<c.osaeMax?'#f9a825':'#c62828';
+  const stateStr=secs<c.osaeWazaari?'計測中':secs<c.osaeMax?'技あり付与済':'一本!';
+  document.getElementById('opp-num').textContent=secs;
+  document.getElementById('opp-num').style.color=barC;
+  document.getElementById('opp-lbl').style.color=barC;
+  document.getElementById('opp-state').textContent=stateStr;
+  document.getElementById('opp-state').style.color=barC;
+  pop.style.display='flex';
 }
 
-function renderPanel(side) {
-  const isAka = side === 'aka';
-  const baseColor = isAka ? '#cc2936' : '#cccccc';
-  const p = S[side];
-  const cfg = S.settings;
-  const container = document.getElementById('scores-' + side);
-  const canEdit = S.status !== 'finished' || true; // 常に編集可（戻す想定）
-  const isRunning = S.status === 'running' || S.status === 'paused' || S.status === 'idle';
+function renderHdr(){
+  const el=document.getElementById('timer');
+  const low=S.remaining<=30&&S.status==='running';
+  el.textContent=fmtT(S.remaining);el.className=low?'low':'';
+  const sb=document.getElementById('status-badge');
+  const sm={idle:['待機中','rgba(255,255,255,.5)'],running:['試合中','#a5d6a7'],
+    paused:['停止中','#fff176'],finished:['終　了','#ef9a9a']};
+  const[st,sc]=sm[S.status];
+  sb.textContent=st;sb.style.color=sc;sb.style.borderColor=sc;sb.style.background=sc+'30';
+  const rb=document.getElementById('result-badge');
+  const r=getResult();
+  const rm={aka:['赤 勝ち','#e53935','rgba(229,57,53,.15)'],
+    shiro:['白 勝ち','#78909c','rgba(120,144,156,.15)'],
+    draw:['引き分け','#f9a825','rgba(249,168,37,.15)']};
+  if(rm[r]){const[t,c,bg]=rm[r];rb.textContent=t;rb.style.color=c;rb.style.borderColor=c;rb.style.background=bg;}
+  else{rb.textContent='－';rb.style.color='rgba(255,255,255,.35)';rb.style.borderColor='rgba(255,255,255,.25)';rb.style.background='transparent';}
+}
 
-  // スコア行の定義
-  const rows = [
-    {
-      key: 'ippon', emoji: '🥇', label: '一本',
-      val: p.ippon, color: p.ippon >= 1 ? '#ff6b35' : baseColor,
-      canAdd: isRunning && p.ippon < 1,
-      canSub: isRunning && p.ippon > 0,
-      badge: p.ippon >= 1 ? '上限' : null,
-      badgeColor: '#ff6b35'
-    },
-    {
-      key: 'wazaari', emoji: '🥈', label: '技あり',
-      val: p.wazaari, color: p.wazaari >= 2 ? '#2196f3' : baseColor,
-      canAdd: isRunning && p.wazaari < 2,
-      canSub: isRunning && p.wazaari > 0,
-      badge: p.wazaari >= 2 ? '一本相当' : '/2',
-      badgeColor: p.wazaari >= 2 ? '#2196f3' : 'rgba(255,255,255,.38)'
-    },
-    {
-      key: 'yuko', emoji: '🏅', label: '有効',
-      val: p.yuko, color: baseColor,
-      canAdd: isRunning,
-      canSub: isRunning && p.yuko > 0,
-      badge: null
-    },
-    {
-      key: 'shido', emoji: '🟡', label: '指導',
-      val: p.shido, color: '#ffd700',
-      canAdd: isRunning && p.shido < cfg.shidoLim,
-      canSub: isRunning && p.shido > 0,
-      badge: p.shido >= cfg.shidoLim ? '負け' : `/${cfg.shidoLim}`,
-      badgeColor: p.shido >= cfg.shidoLim ? '#f44336' : 'rgba(255,255,255,.38)'
-    }
+function renderPanel(side){
+  const isAka=side==='aka';
+  // ライトモード用の色（赤側は赤、白側はネイビー）
+  const isDark=S.cfg.dark;
+  const bc=isAka?'#c0202e':'#3949ab';
+  const bcD=isAka?'#e53935':'#cccccc';
+  const baseColor=isDark?bcD:bc;
+  const p=S[side],c=S.cfg,cont=document.getElementById('scores-'+side);
+
+  const defs=[
+    {key:'ippon',  label:'一本',
+     color:p.ippon>=1?'#bf360c':baseColor,
+     bg:p.ippon>=1?(isDark?'rgba(255,107,53,.13)':'rgba(191,54,12,.08)'):'',
+     val:p.ippon,  badge:p.ippon>=1?'上限':null, badgeC:'#bf360c', addOk:p.ippon<1},
+    {key:'wazaari',label:'技有',
+     color:p.wazaari>=2?'#1565c0':baseColor,
+     bg:p.wazaari>=2?(isDark?'rgba(33,150,243,.13)':'rgba(21,101,192,.08)'):'',
+     val:p.wazaari,badge:p.wazaari>=2?'一本相当':'/2',
+     badgeC:p.wazaari>=2?'#1565c0':'rgba(0,0,0,.35)', addOk:p.wazaari<2},
+    {key:'yuko',   label:'有効',
+     color:baseColor,bg:'',val:p.yuko,badge:null,addOk:true},
+    {key:'shido',  label:'指導',
+     color:'#c8a000',
+     bg:p.shido>=c.shidoLim?(isDark?'rgba(255,215,0,.1)':'rgba(200,160,0,.08)'):'',
+     val:p.shido,badge:p.shido>=c.shidoLim?'負け':`/${c.shidoLim}`,
+     badgeC:p.shido>=c.shidoLim?'#c62828':'rgba(0,0,0,.35)',addOk:p.shido<c.shidoLim},
   ];
 
-  // 抑え込み
-  const isMyOsae = S.osaeSide === side;
-  const osaeActive = isMyOsae;
-  const osaeIsRunning = isMyOsae && S.osaeRunning;
-  const secs = p.osaeKomiSecs;
-  const wazaariSecs = cfg.osaeWazaari;
-  const maxSecs = cfg.osaeMax;
-  const prog = maxSecs > 0 ? Math.min(1, secs / maxSecs) : 0;
-  const wazaariProg = maxSecs > 0 ? Math.min(1, wazaariSecs / maxSecs) : 0;
-  // 技あり到達前→緑、技あり〜一本前→黄、一本→赤
-  const barColor = secs < wazaariSecs ? '#4caf50' : secs < maxSecs ? '#ffd700' : '#ff5722';
-
-  // ─── DOM構築（差分更新のため毎回再生成は避けてinnerHTMLで）───
-  // (パフォーマンス上問題ない規模なのでinnerHTMLで生成)
-  let html = '';
-
-  for (const r of rows) {
-    const c = r.color;
-    const addDisabled = r.canAdd ? '' : 'disabled';
-    const subDisabled = r.canSub ? '' : 'disabled';
-    html += `<div class="score-row" style="border-color:${c}30">
-      <div class="score-label">
-        <span class="emoji">${r.emoji}</span>
-        <span class="ltext">${r.label}</span>
-      </div>
-      <div class="score-center">
-        <button class="round-btn" style="width:28px;height:28px;border-color:${subDisabled?'rgba(255,255,255,.12)':c+'60'};color:${subDisabled?'rgba(255,255,255,.24)':c}"
-          onclick="changeScore('${side}','${r.key}',-1)" ${subDisabled}>
-          <svg width="12" height="12" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        </button>
-        <div class="score-num-wrap">
-          <div class="score-num" style="color:${c}">${r.val}</div>
-          ${r.badge ? `<div class="score-badge" style="color:${r.badgeColor}">${r.badge}</div>` : ''}
-        </div>
-        <button class="round-btn" style="width:28px;height:28px;border-color:${addDisabled?'rgba(255,255,255,.12)':c+'60'};color:${addDisabled?'rgba(255,255,255,.24)':c}"
-          onclick="changeScore('${side}','${r.key}',1)" ${addDisabled}>
-          <svg width="12" height="12" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        </button>
-      </div>
+  function card(r){
+    const col=r.color;
+    const bgExtra=r.bg?`background:${r.bg};`:'';
+    const invOk=r.val>0;
+    return`<div class="scard${r.addOk?'':' disabled'}"
+      style="border-color:${col}60;${bgExtra}"
+      onclick="addScore('${side}','${r.key}')">
+      <div class="sc-label">${r.label}</div>
+      <div class="sc-val" style="color:${col}">${r.val}</div>
+      ${r.badge?`<div class="sc-badge" style="color:${r.badgeC}">${r.badge}</div>`:''}
+      <button class="inv-btn${invOk?'':' disabled'}"
+        onclick="subScore('${side}','${r.key}',event)" ${invOk?'':'disabled'}>無効</button>
     </div>`;
   }
 
-  // 抑え込み行
-  const startEnabled = !osaeIsRunning && isRunning && (!S.osaeSide || S.osaeSide === side);
-  const pauseEnabled = osaeIsRunning;
-  const releaseEnabled = osaeActive;
-  const startPauseDisabled = (osaeIsRunning ? !pauseEnabled : !startEnabled) ? 'disabled' : '';
-  const releaseDisabled = releaseEnabled ? '' : 'disabled';
-  const icon = osaeIsRunning
-    ? `<svg class="btn-icon" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`
-    : `<svg class="btn-icon" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
-  const btnLabel = osaeIsRunning ? '一時停止' : '開始';
-  const startBtnColor = osaeIsRunning ? '#ffd700' : '#4caf50';
-  const secsColor = osaeActive ? barColor : 'rgba(255,255,255,.38)';
+  // 抑え込み
+  const myOsae=S.osaeSide===side;
+  const osaeOn=myOsae&&S.osaeOn;
+  const secs=p.osaeSecs,wSecs=c.osaeWazaari,maxSecs=c.osaeMax;
+  const prog=maxSecs>0?Math.min(1,secs/maxSecs):0;
+  const wProg=maxSecs>0?Math.min(1,wSecs/maxSecs):0;
+  const barC=secs<wSecs?'#2e7d32':secs<maxSecs?'#f9a825':'#c62828';
+  const secsC=myOsae?barC:(isDark?'rgba(255,255,255,.28)':'rgba(0,0,0,.28)');
+  const stateStr=!myOsae?'':secs<wSecs?'計測中':secs<maxSecs?'技あり付与済':'一本!';
+  const canStart=(!S.osaeOn||(S.osaeOn&&myOsae))&&
+    (S.status==='running'||S.status==='paused'||S.status==='idle');
+  const sBtnC=osaeOn?'#f9a825':'#2e7d32';
+  const sIcon=osaeOn
+    ?`<svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`
+    :`<svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
 
-  html += `<div class="osae-row${osaeActive?' active':''}">
-    <div class="osae-header">
-      <span class="emoji">🔒</span>
-      <span class="ltext">抑え込み</span>
-      <span class="maxsec">技あり${wazaariSecs}秒／一本${maxSecs}秒</span>
+  // 進捗バー縦：高さをprogで
+  const fillH=(prog*100).toFixed(1);
+  const markBot=Math.max(0,Math.min(100,(wProg*100))).toFixed(1);
+
+  const osaeHTML=`<div class="osae-card${myOsae?' active':''}">
+    <div class="osae-info">
+      <span class="otitle">抑込</span>
+      <span class="othresh">技${wSecs}秒/一本${maxSecs}秒</span>
     </div>
-    <div class="osae-controls">
-      <button class="osae-btn" style="border-color:${startPauseDisabled?'rgba(255,255,255,.24)':startBtnColor};color:${startPauseDisabled?'rgba(255,255,255,.24)':startBtnColor}"
-        onclick="handleOsaeStart('${side}')" ${startPauseDisabled}>
-        ${icon}<span class="btn-label">${btnLabel}</span>
+    <div class="osae-btn-row">
+      <button class="osae-abtn"
+        style="border-color:${canStart?sBtnC:'rgba(128,128,128,.3)'};color:${canStart?sBtnC:(isDark?'rgba(255,255,255,.25)':'rgba(0,0,0,.25)')}"
+        onclick="osaeStart('${side}')" ${canStart?'':'disabled'}>
+        ${sIcon}<span>${osaeOn?'一時停止':'開始'}</span>
       </button>
-      <div class="osae-secs-wrap">
-        <div class="osae-secs" style="color:${secsColor}">${secs}</div>
-        <div class="osae-unit" style="color:${secsColor}">秒</div>
+      <button class="osae-abtn"
+        style="border-color:${myOsae?'#c62828':'rgba(128,128,128,.3)'};color:${myOsae?'#c62828':(isDark?'rgba(255,255,255,.25)':'rgba(0,0,0,.25)')}"
+        onclick="osaeRelease('${side}')" ${myOsae?'':'disabled'}>
+        <svg viewBox="0 0 24 24"><rect x="3" y="11" width="11" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+        <span>解けた</span>
+      </button>
+      <div class="osae-prog-v">
+        <div class="osae-prog-fill" style="height:${fillH}%;background:${barC}"></div>
+        <div class="osae-prog-mark" style="bottom:${markBot}%"></div>
       </div>
-      <button class="osae-btn" style="border-color:${releaseDisabled?'rgba(255,255,255,.24)':'#ff5722'};color:${releaseDisabled?'rgba(255,255,255,.24)':'#ff5722'}"
-        onclick="handleOsaeRelease('${side}')" ${releaseDisabled}>
-        <svg class="btn-icon" viewBox="0 0 24 24"><rect x="3" y="11" width="11" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
-        <span class="btn-label">解けた</span>
-      </button>
     </div>
-    ${osaeActive ? `<div class="osae-progress" style="position:relative">
-      <div class="osae-bar" style="width:${(prog*100).toFixed(1)}%;background:${barColor}"></div>
-      <div style="position:absolute;top:-4px;left:${(wazaariProg*100).toFixed(1)}%;width:2px;height:12px;background:#ffd700;border-radius:1px;transform:translateX(-50%)" title="技あり"></div>
-    </div>` : ''}
   </div>`;
 
-  container.innerHTML = html;
-  adaptScoreSizes(container);
+  cont.innerHTML=`
+    <div class="score-pair">${card(defs[0])}${card(defs[1])}</div>
+    <div class="score-pair">${card(defs[2])}${card(defs[3])}</div>
+    <div class="osae-wrap">${osaeHTML}</div>`;
 }
 
-function adaptScoreSizes(container) {
-  // 各行の実際の高さに応じてフォントサイズを動的調整
-  const rows = container.querySelectorAll('.score-row');
-  rows.forEach(row => {
-    const h = row.offsetHeight;
-    if (!h) return;
-    const numEl = row.querySelector('.score-num');
-    const btnEls = row.querySelectorAll('.round-btn');
-    const sz = Math.max(14, Math.min(26, h * 0.48));
-    const bsz = Math.max(22, Math.min(34, h * 0.62));
-    if (numEl) numEl.style.fontSize = sz + 'px';
-    btnEls.forEach(b => {
-      b.style.width = bsz + 'px';
-      b.style.height = bsz + 'px';
-    });
-  });
+function renderFooter(){
+  const bm=document.getElementById('btn-main');
+  const bi=document.getElementById('btn-invalid');
+  bi.disabled=!S.history.length;
+  const cfg={
+    idle:    ['▶ 開始',false,'rgba(255,255,255,.9)'],
+    running: ['⏸ 一時停止',false,'#fff176'],
+    paused:  ['▶ 再開',false,'rgba(255,255,255,.9)'],
+    finished:['終　了',true,'rgba(255,255,255,.35)'],
+  }[S.status];
+  bm.textContent=cfg[0];bm.disabled=cfg[1];
+  bm.style.borderColor=cfg[2];bm.style.color=cfg[2];
 }
 
-function renderFooter() {
-  const btn = document.getElementById('btn-main');
-  const undoBtn = document.getElementById('btn-undo');
-  if (S.status === 'idle') {
-    btn.textContent = '▶ 開始'; btn.disabled = false;
-    btn.style.borderColor = '#4caf50'; btn.style.color = '#4caf50';
-  } else if (S.status === 'running') {
-    btn.textContent = '⏸ 一時停止'; btn.disabled = false;
-    btn.style.borderColor = '#ffd700'; btn.style.color = '#ffd700';
-  } else if (S.status === 'paused') {
-    btn.textContent = '▶ 再開'; btn.disabled = false;
-    btn.style.borderColor = '#4caf50'; btn.style.color = '#4caf50';
-  } else {
-    btn.textContent = '▶ 開始'; btn.disabled = true;
-    btn.style.borderColor = ''; btn.style.color = '';
-  }
-  undoBtn.disabled = S.history.length === 0;
-}
-
-// ─── 初期化 ──────────────────────────────────────────────────────────
-window.addEventListener('resize', () => {
-  render();
-});
-S.remaining = S.settings.matchDur;
+// ── 初期化 ────────────────────────────────────────
 render();
+window.addEventListener('resize',render);
 </script>
 </body>
 </html>
