@@ -2,710 +2,397 @@
 <html lang="ja" data-theme="light">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>稽古タイマー</title>
 <style>
-/* ===== CSS VARIABLES: LIGHT (default) ===== */
-:root {
-  --bg:           #F2F4F8;
-  --bg-card:      #FFFFFF;
-  --bg-card2:     #F7F9FC;
-  --border:       rgba(0,0,0,0.09);
-  --border2:      rgba(0,0,0,0.06);
-  --text:         #1A1D24;
-  --text-sub:     rgba(0,0,0,0.45);
-  --text-muted:   rgba(0,0,0,0.28);
-  --tab-bg:       rgba(0,0,0,0.07);
-  --tab-text:     rgba(0,0,0,0.38);
-  --drum-bg:      rgba(0,0,0,0.04);
-  --drum-fade-bg: #F7F9FC;
-  --drum-sel:     rgba(0,0,0,0.06);
-  --drum-item:    rgba(0,0,0,0.18);
-  --drum-center:  #1A1D24;
-  --ring-track:   rgba(0,0,0,0.08);
-  --toast-bg:     #1A1D24;
-  --toast-text:   #fff;
-  --round-fade:   #F7F9FC;
-  --toggle-off:   rgba(0,0,0,0.15);
-  --info-bg:      rgba(0,0,0,0.04);
-  --info-border:  rgba(0,0,0,0.07);
-  --section-text: rgba(0,0,0,0.4);
-  --ctrl-pause-bg:rgba(30,120,220,0.1);
-  --ctrl-stop-bg: rgba(220,50,50,0.1);
-  --start-shadow: rgba(30,100,200,0.3);
+:root{
+  --bg:#F3F4F6; --card:#FFFFFF; --text:#111827; --sub:#6B7280; --line:#E5E7EB;
+  --blue:#2563EB; --blue-bg:#DBEAFE; --orange:#D97706; --orange-bg:#FEF3C7;
+  --red:#DC2626; --track:#E5E7EB; --sheet:#FFFFFF; --overlay:rgba(17,24,39,.45);
+  --chip:#E5E7EB; --sel:#EEF2F7; --toast:#111827;
 }
-/* ===== DARK MODE ===== */
-[data-theme="dark"] {
-  --bg:           #0D0F14;
-  --bg-card:      rgba(255,255,255,0.07);
-  --bg-card2:     rgba(255,255,255,0.04);
-  --border:       rgba(255,255,255,0.11);
-  --border2:      rgba(255,255,255,0.06);
-  --text:         #FFFFFF;
-  --text-sub:     rgba(255,255,255,0.45);
-  --text-muted:   rgba(255,255,255,0.28);
-  --tab-bg:       rgba(255,255,255,0.07);
-  --tab-text:     rgba(255,255,255,0.38);
-  --drum-bg:      rgba(255,255,255,0.06);
-  --drum-fade-bg: #0D0F14;
-  --drum-sel:     rgba(255,255,255,0.08);
-  --drum-item:    rgba(255,255,255,0.22);
-  --drum-center:  #FFFFFF;
-  --ring-track:   rgba(255,255,255,0.10);
-  --toast-bg:     #1A1D25;
-  --toast-text:   #fff;
-  --round-fade:   #0D0F14;
-  --toggle-off:   rgba(255,255,255,0.15);
-  --info-bg:      rgba(255,255,255,0.05);
-  --info-border:  rgba(255,255,255,0.08);
-  --section-text: rgba(255,255,255,0.45);
-  --ctrl-pause-bg:rgba(100,181,246,0.15);
-  --ctrl-stop-bg: rgba(239,83,80,0.15);
-  --start-shadow: rgba(100,181,246,0.35);
+[data-theme="dark"]{
+  --bg:#0F1115; --card:#1B1E25; --text:#F3F4F6; --sub:#9CA3AF; --line:#2A2E37;
+  --blue:#4F8EF7; --blue-bg:#1E2F52; --orange:#F5A524; --orange-bg:#3A2D12;
+  --red:#EF5350; --track:#2A2E37; --sheet:#1B1E25; --overlay:rgba(0,0,0,.6);
+  --chip:#2A2E37; --sel:#2A2E37; --toast:#2A2E37;
 }
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{background:var(--bg);color:var(--text);min-height:100vh;
+  font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans','Segoe UI',sans-serif;
+  user-select:none;-webkit-user-select:none;transition:background .2s,color .2s}
+button{font-family:inherit}
+#app{max-width:480px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column}
 
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-  background:var(--bg);color:var(--text);min-height:100vh;
-  user-select:none;-webkit-user-select:none;transition:background .3s,color .3s}
+/* Header */
+#header{position:sticky;top:0;z-index:50;background:var(--bg);display:flex;align-items:center;
+  justify-content:space-between;gap:12px;padding:14px 16px 10px}
+.title-block h1{font-size:20px;font-weight:800;white-space:nowrap}
+.title-block p{font-size:10px;color:var(--sub);letter-spacing:2px;margin-top:1px}
+#tab-bar{display:flex;background:var(--chip);border-radius:10px;padding:3px;flex-shrink:0}
+.tab-btn{border:none;background:transparent;color:var(--sub);font-size:13px;font-weight:600;
+  padding:9px 14px;border-radius:8px;cursor:pointer;white-space:nowrap}
+.tab-btn.active{background:var(--card);color:var(--blue)}
 
-#app{display:flex;flex-direction:column;min-height:100vh;max-width:480px;margin:0 auto}
+#content{flex:1;display:flex;flex-direction:column}
+.theme-btn{border:none;background:var(--chip);color:var(--text);font-size:13px;font-weight:700;padding:11px 16px;border-radius:10px;cursor:pointer;white-space:nowrap}
+.screen{padding:8px 16px 16px;display:none;flex-direction:column;overflow:hidden}
 
-/* Header — fixed at top */
-#header{position:sticky;top:0;z-index:100;
-  background:var(--bg);
-  display:flex;align-items:center;justify-content:space-between;padding:16px 20px 8px;gap:12px;
-  border-bottom:1px solid var(--border2);}
-.title-block{min-width:0;flex:1}
-.title-block h1{font-size:20px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.title-block p{font-size:10px;color:var(--text-muted);letter-spacing:2px;margin-top:1px}
-#tab-bar{display:flex;gap:2px;background:var(--tab-bg);border-radius:24px;padding:3px;flex-shrink:0}
-.tab-btn{display:flex;align-items:center;gap:4px;padding:7px 12px;border:none;background:transparent;
-  color:var(--tab-text);font-size:12px;border-radius:20px;cursor:pointer;transition:all .2s;
-  white-space:nowrap;font-family:inherit}
-.tab-btn.active{background:rgba(30,120,220,0.15);color:#1E78DC;font-weight:600}
-[data-theme="dark"] .tab-btn.active{background:rgba(100,181,246,0.2);color:#64B5F6}
+/* Rows (tap to edit) */
+.rows{display:flex;flex-direction:column;gap:10px}
+.row{display:flex;align-items:center;gap:14px;width:100%;border:none;background:var(--card);
+  border-radius:14px;padding:18px 16px;cursor:pointer;text-align:left;color:var(--text);min-height:72px}
+.row:active{background:var(--sel)}
+.row-ico{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.ico-rounds{background:var(--blue-bg)} .ico-keiko{background:var(--blue-bg)} .ico-interval{background:var(--orange-bg)}
+.row-label{flex:1;font-size:14px;font-weight:600;color:var(--sub)}
+.row-val{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums}
+.row-chev{color:var(--sub);font-size:20px;font-weight:300}
 
-#content{flex:1;overflow-y:auto;display:flex;flex-direction:column}
-/* タイマー画面はスクロールさせない */
-#screen-idle{overflow:hidden}
-#screen-running{overflow:hidden}
+/* Big buttons */
+.big-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;border:none;
+  border-radius:14px;height:76px;font-size:22px;font-weight:800;color:#fff;cursor:pointer}
+.big-btn:active{opacity:.85;transform:scale(.99)}
+.btn-start{background:var(--blue);margin-top:16px;height:88px;font-size:26px}
+.btn-blue{background:var(--blue)} .btn-red{background:var(--red)} .btn-orange{background:var(--orange)}
 
-/* ===== IDLE ===== */
-#screen-idle{padding:24px 20px 0;height:100%;display:flex;flex-direction:column}
-.summary-card{background:var(--bg-card);border:1px solid var(--border);border-radius:20px;padding:20px;
-  box-shadow:0 2px 12px rgba(0,0,0,0.06)}
-[data-theme="dark"] .summary-card{box-shadow:none}
-.summary-row{display:flex;align-items:center;gap:10px;padding:7px 0}
-.summary-row+.summary-row{border-top:1px solid var(--border2)}
-.summary-icon{font-size:17px;width:22px;text-align:center}
-.summary-label{color:var(--text-sub);font-size:14px;flex:1}
-.summary-val{font-size:15px;font-weight:600}
-.start-wrap{display:flex;justify-content:center;margin-top:32px}
-#btn-start{width:136px;height:136px;border-radius:50%;
-  background:linear-gradient(135deg,#3B8FE8,#1565C0);
-  border:none;color:#fff;cursor:pointer;display:flex;flex-direction:column;
-  align-items:center;justify-content:center;gap:4px;
-  box-shadow:0 0 40px var(--start-shadow);
-  transition:transform .15s,box-shadow .15s;font-family:inherit}
-#btn-start:hover{transform:scale(1.04);box-shadow:0 0 56px var(--start-shadow)}
-#btn-start:active{transform:scale(0.96)}
-#btn-start .play-icon{font-size:46px;line-height:1}
-#btn-start .play-label{font-size:12px;font-weight:600;letter-spacing:1px}
-
-/* ===== RUNNING ===== */
-#screen-running{padding:16px 20px 0;display:flex;flex-direction:column;align-items:center}
-.round-info{text-align:center;margin-bottom:16px}
-.round-ratio{color:var(--text-muted);font-size:16px;font-weight:300}
-.round-main{font-size:30px;font-weight:700;margin-top:4px}
-.ring-wrap{position:relative;width:210px;height:210px;margin-bottom:10px}
-#progress-canvas{position:absolute;top:0;left:0}
+/* Running */
+.round-info{text-align:center;margin:6px 0 10px}
+.round-ratio{color:var(--sub);font-size:14px;font-weight:600;min-height:18px}
+.round-main{font-size:34px;font-weight:800;margin-top:2px}
+.ring-wrap{position:relative;width:220px;height:220px;margin:0 auto 12px}
+#progress-canvas{position:absolute;inset:0}
 .ring-inner{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
-.time-display{font-size:48px;font-weight:200;letter-spacing:3px;font-variant-numeric:tabular-nums}
-.time-label{font-size:12px;color:var(--text-muted);letter-spacing:2px;margin-top:2px}
+.time-display{font-size:52px;font-weight:300;font-variant-numeric:tabular-nums;letter-spacing:2px}
+.time-label{font-size:12px;color:var(--sub);margin-top:2px;letter-spacing:2px}
+.phase-row{display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+.badge{padding:7px 14px;border-radius:8px;font-size:13px;font-weight:700}
+.badge-keiko{background:var(--blue-bg);color:var(--blue)}
+.badge-interval{background:var(--orange-bg);color:var(--orange)}
+.chip{padding:7px 12px;border-radius:8px;font-size:12px;font-weight:600;background:var(--chip);color:var(--sub)}
+.chip b{color:var(--text)}
+.controls{display:flex;gap:10px}
+.controls .big-btn{height:72px;font-size:18px;flex:1}
 
-/* phase + interval info row */
-.phase-row{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;justify-content:center}
-.phase-badge{padding:5px 14px;border-radius:20px;font-size:13px;font-weight:600;letter-spacing:.5px;transition:all .3s;white-space:nowrap}
-.phase-keiko{background:rgba(30,120,220,0.12);color:#1E78DC;border:1px solid rgba(30,120,220,0.3)}
-[data-theme="dark"] .phase-keiko{background:rgba(100,181,246,0.15);color:#64B5F6;border-color:rgba(100,181,246,0.35)}
-.phase-interval{background:rgba(230,150,0,0.12);color:#C87800;border:1px solid rgba(230,150,0,0.3)}
-[data-theme="dark"] .phase-interval{background:rgba(255,183,77,0.15);color:#FFB74D;border-color:rgba(255,183,77,0.35)}
-.phase-waiting{background:rgba(230,150,0,0.15);color:#C87800;border:1px solid rgba(230,150,0,0.5);
-  animation:pulse-border 1.2s ease-in-out infinite}
-[data-theme="dark"] .phase-waiting{background:rgba(255,183,77,0.2);color:#FFB74D;border-color:rgba(255,183,77,0.6)}
-@keyframes pulse-border{0%,100%{box-shadow:0 0 0 0 rgba(200,120,0,0.4)}50%{box-shadow:0 0 0 8px rgba(200,120,0,0)}}
-[data-theme="dark"] @keyframes pulse-border{0%,100%{box-shadow:0 0 0 0 rgba(255,183,77,0.4)}50%{box-shadow:0 0 0 8px rgba(255,183,77,0)}}
-
-/* interval info chip (shown in timer screen) */
-.interval-chip{padding:4px 12px;border-radius:16px;font-size:12px;font-weight:500;
-  background:var(--info-bg);border:1px solid var(--info-border);
-  color:var(--text-sub);white-space:nowrap}
-.interval-chip .chip-val{font-weight:700;color:var(--text)}
-
-/* tap overlay */
-#tap-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-  cursor:pointer;z-index:10;border-radius:50%;background:rgba(200,120,0,0.06)}
-[data-theme="dark"] #tap-overlay{background:rgba(255,183,77,0.08)}
-#tap-overlay-label{text-align:center;pointer-events:none}
-#tap-overlay-label .tap-icon{font-size:36px;animation:bounce .9s ease-in-out infinite}
-#tap-overlay-label .tap-text{font-size:12px;color:#C87800;font-weight:700;letter-spacing:1px;margin-top:4px}
-[data-theme="dark"] #tap-overlay-label .tap-text{color:#FFB74D}
-@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
-
-.controls{display:flex;gap:24px;margin-top:0}
-.ctrl-btn{display:flex;flex-direction:column;align-items:center;gap:8px;background:none;border:none;cursor:pointer;font-family:inherit}
-.ctrl-circle{width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:28px;transition:transform .15s;border:1.5px solid}
-.ctrl-btn:active .ctrl-circle{transform:scale(0.93)}
-.ctrl-pause .ctrl-circle{background:var(--ctrl-pause-bg);border-color:rgba(30,120,220,0.45);color:#1E78DC}
-.ctrl-pause span{color:#1E78DC;font-size:12px;letter-spacing:1px}
-[data-theme="dark"] .ctrl-pause .ctrl-circle{border-color:rgba(100,181,246,0.5);color:#64B5F6}
-[data-theme="dark"] .ctrl-pause span{color:#64B5F6}
-.ctrl-stop .ctrl-circle{background:var(--ctrl-stop-bg);border-color:rgba(220,50,50,0.45);color:#DC3232}
-.ctrl-stop span{color:#DC3232;font-size:12px;letter-spacing:1px}
-[data-theme="dark"] .ctrl-stop .ctrl-circle{border-color:rgba(239,83,80,0.5);color:#EF5350}
-[data-theme="dark"] .ctrl-stop span{color:#EF5350}
-
-/* ===== SETTINGS ===== */
-#screen-settings{padding:8px 0 40px}
-.section-label{padding:10px 20px 6px;font-size:11px;color:var(--section-text);letter-spacing:2px;font-weight:600}
-.time-setting-card,.interval-mode-card{
-  margin:0 16px 8px;background:var(--bg-card);border:1px solid var(--border);
-  border-radius:16px;padding:14px 18px;
-  box-shadow:0 1px 6px rgba(0,0,0,0.05)}
-[data-theme="dark"] .time-setting-card,[data-theme="dark"] .interval-mode-card{box-shadow:none;background:var(--bg-card)}
-.time-setting-title{font-size:13px;font-weight:600;margin-bottom:14px;letter-spacing:.5px}
-.keiko-title{color:#1E78DC}
-[data-theme="dark"] .keiko-title{color:#64B5F6}
-.interval-title{color:#C87800}
-[data-theme="dark"] .interval-title{color:#FFB74D}
-
-/* ── ドラムロール ── */
-.drum-row{display:flex;align-items:flex-start;justify-content:center;gap:8px}
+/* Modal (bottom sheet) */
+.modal{position:fixed;inset:0;background:var(--overlay);display:none;align-items:flex-end;justify-content:center;z-index:200}
+.modal.open{display:flex}
+.sheet{width:100%;max-width:480px;background:var(--sheet);border-radius:20px 20px 0 0;padding:20px 16px calc(16px + env(safe-area-inset-bottom));animation:up .2s ease-out}
+@keyframes up{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+.sheet-title{font-size:16px;font-weight:800;text-align:center;margin-bottom:14px}
+.sheet-done{margin-top:16px;height:60px;font-size:18px}
+.seg{display:flex;background:var(--chip);border-radius:12px;padding:4px;margin-bottom:14px}
+.seg button{flex:1;border:none;background:transparent;color:var(--sub);font-size:15px;font-weight:700;padding:14px 8px;border-radius:9px;cursor:pointer}
+.seg button.active{background:var(--card);color:var(--orange)}
+.drum-row{display:flex;justify-content:center;align-items:flex-start;gap:10px}
 .picker-col{display:flex;flex-direction:column;align-items:center;gap:4px}
-.picker-col label{font-size:11px;color:var(--text-sub);letter-spacing:1px}
-.picker-drum{height:132px;width:80px;overflow-y:scroll;scroll-snap-type:y mandatory;
-  -webkit-overflow-scrolling:touch;scrollbar-width:none;border-radius:10px;
-  background:var(--drum-bg);position:relative}
-.picker-drum::-webkit-scrollbar{display:none}
-.drum-wrap{position:relative;width:80px}
-.drum-wrap::before,.drum-wrap::after{content:'';position:absolute;left:0;right:0;height:40px;z-index:2;pointer-events:none}
-.drum-wrap::before{top:0;background:linear-gradient(to bottom,var(--drum-fade-bg) 20%,transparent)}
-.drum-wrap::after{bottom:0;background:linear-gradient(to top,var(--drum-fade-bg) 20%,transparent)}
-.drum-sel{position:absolute;left:4px;right:4px;top:50%;transform:translateY(-50%);
-  height:42px;background:var(--drum-sel);border-radius:8px;pointer-events:none;z-index:1}
-.drum-item{height:44px;display:flex;align-items:center;justify-content:center;
-  scroll-snap-align:center;font-size:26px;font-weight:600;
-  color:var(--drum-item);transition:color .1s;font-variant-numeric:tabular-nums}
-.drum-item.center{color:var(--drum-center)}
-.colon-sep{font-size:28px;font-weight:700;color:var(--text-sub);padding-top:28px}
+.picker-col label{font-size:12px;color:var(--sub);font-weight:600}
+.drum-wrap{position:relative;border-radius:12px;background:var(--bg);overflow:hidden}
+.drum-wrap::before,.drum-wrap::after{content:'';position:absolute;left:0;right:0;height:44px;z-index:2;pointer-events:none}
+.drum-wrap::before{top:0;background:linear-gradient(var(--bg) 15%,transparent)}
+.drum-wrap::after{bottom:0;background:linear-gradient(transparent,var(--bg) 85%)}
+.drum-sel{position:absolute;left:6px;right:6px;top:50%;height:48px;transform:translateY(-50%);background:var(--sel);border-radius:10px;z-index:1;pointer-events:none}
+.drum{position:relative;z-index:0;height:144px;overflow-y:scroll;scroll-snap-type:y mandatory;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.drum::-webkit-scrollbar{display:none}
+.drum-item{height:48px;display:flex;align-items:center;justify-content:center;scroll-snap-align:center;
+  font-size:28px;font-weight:700;color:var(--sub);opacity:.45;font-variant-numeric:tabular-nums}
+.drum-item.center{color:var(--text);opacity:1}
+.colon{font-size:30px;font-weight:800;color:var(--sub);padding-top:42px}
 
-/* Manual interval toggle */
-.toggle-row{display:flex;align-items:center;justify-content:space-between}
-.toggle-desc{font-size:13px;font-weight:500}
-.toggle-sub{font-size:11px;color:var(--text-muted);margin-top:3px}
-.toggle-switch{position:relative;width:52px;height:30px;flex-shrink:0}
-.toggle-switch input{opacity:0;width:0;height:0}
-.toggle-slider{position:absolute;inset:0;background:var(--toggle-off);border-radius:30px;cursor:pointer;transition:background .25s}
-.toggle-slider:before{content:'';position:absolute;width:24px;height:24px;left:3px;top:3px;
-  background:#fff;border-radius:50%;transition:transform .25s;box-shadow:0 1px 4px rgba(0,0,0,0.3)}
-.toggle-switch input:checked+.toggle-slider{background:#C87800}
-[data-theme="dark"] .toggle-switch input:checked+.toggle-slider{background:#FFB74D}
-.toggle-switch input:checked+.toggle-slider:before{transform:translateX(22px)}
-.manual-time-note{font-size:11px;color:#C87800;margin-top:12px;padding-top:12px;border-top:1px solid var(--border2)}
-[data-theme="dark"] .manual-time-note{color:rgba(255,183,77,0.7)}
+/* Settings */
+.sec-label{font-size:12px;font-weight:700;color:var(--sub);letter-spacing:1px;margin:18px 4px 8px}
+.theme-opts{display:flex;gap:10px}
+.theme-opt{flex:1;height:64px;border:2px solid transparent;background:var(--card);color:var(--sub);border-radius:14px;
+  font-size:15px;font-weight:700;cursor:pointer}
+.theme-opt.active{border-color:var(--blue);color:var(--blue)}
 
-/* Round picker */
-.round-picker-wrap{margin:0 16px;background:var(--bg-card);border:1px solid var(--border);
-  border-radius:16px;height:112px;overflow:hidden;position:relative;
-  box-shadow:0 1px 6px rgba(0,0,0,0.05)}
-[data-theme="dark"] .round-picker-wrap{box-shadow:none}
-.round-picker-wrap::before,.round-picker-wrap::after{content:'';position:absolute;left:0;right:0;height:34px;z-index:2;pointer-events:none}
-.round-picker-wrap::before{top:0;background:linear-gradient(to bottom,var(--bg-card) 30%,transparent)}
-.round-picker-wrap::after{bottom:0;background:linear-gradient(to top,var(--bg-card) 30%,transparent)}
-.selection-line{position:absolute;left:12px;right:12px;top:50%;transform:translateY(-50%);
-  height:38px;background:rgba(30,120,220,0.08);border-radius:8px;pointer-events:none;z-index:1}
-[data-theme="dark"] .selection-line{background:rgba(100,181,246,0.1)}
-#round-list{height:100%;overflow-y:scroll;scroll-snap-type:y mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:37px 0}
-#round-list::-webkit-scrollbar{display:none}
-.round-item{height:38px;display:flex;align-items:center;justify-content:center;
-  scroll-snap-align:center;font-size:19px;font-weight:600;color:var(--text-muted);cursor:pointer;transition:color .1s}
-.round-item.selected{color:#1E78DC}
-[data-theme="dark"] .round-item.selected{color:#64B5F6}
-
-/* Theme toggle card */
-.theme-card{margin:0 16px 8px;background:var(--bg-card);border:1px solid var(--border);
-  border-radius:16px;padding:14px 18px;box-shadow:0 1px 6px rgba(0,0,0,0.05)}
-[data-theme="dark"] .theme-card{box-shadow:none}
-.theme-options{display:flex;gap:8px;margin-top:10px}
-.theme-opt{flex:1;padding:10px 0;border-radius:10px;border:1.5px solid var(--border);
-  background:var(--bg-card2);cursor:pointer;font-size:13px;font-weight:600;
-  color:var(--text-sub);display:flex;flex-direction:column;align-items:center;gap:4px;
-  transition:all .2s;font-family:inherit}
-.theme-opt .opt-icon{font-size:20px}
-.theme-opt.active{border-color:#1E78DC;background:rgba(30,120,220,0.08);color:#1E78DC}
-[data-theme="dark"] .theme-opt.active{border-color:#64B5F6;background:rgba(100,181,246,0.12);color:#64B5F6}
-
-/* Toast */
-#toast{position:fixed;top:68px;left:50%;transform:translateX(-50%) translateY(-6px);
-  background:var(--toast-bg);color:var(--toast-text);border-radius:30px;padding:10px 24px;
-  font-size:15px;font-weight:700;letter-spacing:1px;opacity:0;
-  transition:opacity .2s,transform .2s;pointer-events:none;white-space:nowrap;z-index:999;
-  border-width:1.5px;border-style:solid}
+#toast{position:fixed;top:72px;left:50%;transform:translateX(-50%) translateY(-6px);background:var(--toast);color:#fff;
+  padding:12px 22px;border-radius:10px;font-size:15px;font-weight:700;opacity:0;pointer-events:none;
+  transition:opacity .2s,transform .2s;white-space:nowrap;z-index:300}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 </style>
 </head>
 <body>
 <div id="app">
   <div id="header">
-    <div class="title-block">
-      <h1>稽古タイマー</h1>
-      <p>KEIKO TIMER</p>
-    </div>
-    <div id="tab-bar">
-      <button class="tab-btn active" id="tab-timer" onclick="showTab('timer')">⏱ タイマー</button>
-      <button class="tab-btn" id="tab-settings" onclick="showTab('settings')">⚙ 設定</button>
-    </div>
+    <div class="title-block"><h1>稽古タイマー</h1><p>KEIKO TIMER</p></div>
+    <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">ダークモード</button>
   </div>
 
   <div id="content">
     <!-- IDLE -->
-    <div id="screen-idle">
-      <div class="summary-card">
-        <div class="summary-row"><span class="summary-icon">🔁</span><span class="summary-label">本数</span><span class="summary-val" id="sum-rounds">∞ 無限</span></div>
-        <div class="summary-row"><span class="summary-icon">🥋</span><span class="summary-label">稽古時間</span><span class="summary-val" id="sum-keiko">03:00</span></div>
-        <div class="summary-row"><span class="summary-icon">💤</span><span class="summary-label">インターバル</span><span class="summary-val" id="sum-interval">01:00</span></div>
-      </div>
-      <div class="start-wrap">
-        <button id="btn-start" onclick="startTimer()">
-          <div class="play-icon">▶</div>
-          <div class="play-label">スタート</div>
-        </button>
-      </div>
+    <div class="screen" id="screen-idle">
+      <div class="rows" id="rows-idle"></div>
+      <button class="big-btn btn-start" onclick="startTimer()">▶ スタート</button>
     </div>
 
     <!-- RUNNING -->
-    <div id="screen-running" style="display:none">
+    <div class="screen" id="screen-running">
       <div class="round-info">
-        <div class="round-ratio" id="round-ratio">∞</div>
+        <div class="round-ratio" id="round-ratio"></div>
         <div class="round-main" id="round-main">1 本目</div>
       </div>
-      <div class="ring-wrap" id="ring-wrap">
-        <canvas id="progress-canvas" width="210" height="210"></canvas>
+      <div class="ring-wrap">
+        <canvas id="progress-canvas" width="440" height="440" style="width:220px;height:220px"></canvas>
         <div class="ring-inner">
           <div class="time-display" id="time-display">03:00</div>
           <div class="time-label" id="time-label">残り時間</div>
         </div>
-        <div id="tap-overlay" style="display:none" onclick="manualNext()">
-          <div id="tap-overlay-label">
-            <div class="tap-icon">👆</div>
-            <div class="tap-text">タップして開始</div>
-          </div>
-        </div>
       </div>
-      <!-- phase badge + interval info -->
       <div class="phase-row">
-        <div class="phase-badge phase-keiko" id="phase-badge">🥋 稽古中</div>
-        <div class="interval-chip" id="interval-chip">💤 <span id="chip-label">インターバル</span> <span class="chip-val" id="chip-val">01:00</span></div>
+        <div class="badge badge-keiko" id="phase-badge">稽古中</div>
+        <div class="chip" id="interval-chip">インターバル <b id="chip-val">手動</b></div>
       </div>
       <div class="controls">
-        <button class="ctrl-btn ctrl-pause" id="btn-pause" onclick="togglePause()">
-          <div class="ctrl-circle" id="pause-icon">⏸</div>
-          <span id="pause-label">一時停止</span>
-        </button>
-        <button class="ctrl-btn ctrl-stop" onclick="stopTimer()">
-          <div class="ctrl-circle">⏹</div>
-          <span>停止</span>
-        </button>
+        <button class="big-btn btn-blue" id="btn-pause" onclick="togglePause()"><span id="pause-icon">⏸</span><span id="pause-label">一時停止</span></button>
+        <button class="big-btn btn-red" onclick="stopTimer()">⏹ 停止</button>
       </div>
     </div>
 
-    <!-- SETTINGS -->
-    <div id="screen-settings" style="display:none">
-      <div class="section-label">本数設定</div>
-      <div class="round-picker-wrap">
-        <div class="selection-line"></div>
-        <div id="round-list"></div>
-      </div>
+  </div>
+</div>
 
-      <div class="section-label" style="margin-top:14px">稽古時間</div>
-      <div class="time-setting-card">
-        <div class="time-setting-title keiko-title">🥋 稽古時間</div>
-        <div class="drum-row" id="spinner-keiko"></div>
-      </div>
-
-      <div class="section-label">インターバル</div>
-      <div class="interval-mode-card">
-        <div class="toggle-row">
-          <div>
-            <div class="toggle-desc">👆 手動モード</div>
-            <div class="toggle-sub">稽古終了後にタップで次の稽古を開始</div>
-          </div>
-          <label class="toggle-switch">
-            <input type="checkbox" id="manual-toggle" onchange="onManualToggle()">
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-        <div class="manual-time-note" id="manual-note" style="display:none">
-          手動モード中はインターバル時間の設定は使用されません
-        </div>
-      </div>
-      <div class="time-setting-card" id="interval-time-card">
-        <div class="time-setting-title interval-title">💤 インターバル時間</div>
-        <div class="drum-row" id="spinner-interval"></div>
-      </div>
-
-      <div class="section-label" style="margin-top:6px">表示テーマ</div>
-      <div class="theme-card">
-        <div class="time-setting-title" style="margin-bottom:0;color:var(--text-sub)">画面の色</div>
-        <div class="theme-options">
-          <button class="theme-opt active" id="theme-light" onclick="setTheme('light')">
-            <span class="opt-icon">☀️</span>ライト
-          </button>
-          <button class="theme-opt" id="theme-dark" onclick="setTheme('dark')">
-            <span class="opt-icon">🌙</span>ダーク
-          </button>
-        </div>
-      </div>
-    </div>
+<!-- Edit sheet -->
+<div class="modal" id="modal" onclick="if(event.target===this)closeModal()">
+  <div class="sheet">
+    <div class="sheet-title" id="sheet-title"></div>
+    <div id="sheet-body"></div>
+    <button class="big-btn btn-blue sheet-done" onclick="closeModal()">完了</button>
   </div>
 </div>
 <div id="toast"></div>
 
 <script>
 // ===== STATE =====
-let repeatCount    = null;
-let keikoMin       = 3,  keikoSec    = 0;
-let intervalMin    = 1,  intervalSec = 0;
-let manualInterval = true;
-let theme          = 'light';
-
-let timerState   = 'idle';
-let currentRound = 1;
-let phase        = 'keiko';
-let remainingSec = 0;
-let ticker       = null;
-let currentTab   = 'timer';
-
-// ===== THEME =====
-function setTheme(t){
-  theme = t;
-  document.documentElement.setAttribute('data-theme', t);
-  document.getElementById('theme-light').classList.toggle('active', t==='light');
-  document.getElementById('theme-dark').classList.toggle('active', t==='dark');
-  // redraw canvas with new track color
-  if(timerState==='running'||timerState==='paused'||timerState==='waiting') updateRunUI();
-}
+let repeatCount=null, keikoMin=2, keikoSec=0, intervalMin=0, intervalSec=20;
+let manualInterval=false, theme='light';
+let timerState='idle', currentRound=1, phase='keiko', remainingSec=0, ticker=null, currentTab='timer';
 
 // ===== AUDIO =====
-let actx = null;
+let actx=null;
 function getACtx(){
-  if(!actx) actx = new (window.AudioContext||window.webkitAudioContext)();
+  if(!actx) actx=new (window.AudioContext||window.webkitAudioContext)();
   if(actx.state==='suspended') actx.resume();
   return actx;
 }
-function schedTone(freq, startOffset, dur, vol=1.0, type='square'){
+function schedTone(freq,start,dur,vol=1.0){
   try{
-    const a=getACtx();
-    const osc=a.createOscillator(), osc2=a.createOscillator(), g=a.createGain();
-    const now=a.currentTime+startOffset;
-    osc.type=type; osc2.type='sine';
-    osc.frequency.value=freq; osc2.frequency.value=freq*1.5;
-    osc.connect(g); osc2.connect(g); g.connect(a.destination);
-    g.gain.setValueAtTime(vol,now);
-    g.gain.setValueAtTime(vol,now+dur-0.03);
-    g.gain.linearRampToValueAtTime(0,now+dur);
-    osc.start(now); osc2.start(now); osc.stop(now+dur); osc2.stop(now+dur);
+    const a=getACtx(), o=a.createOscillator(), o2=a.createOscillator(), g=a.createGain(), t=a.currentTime+start;
+    o.type='square'; o2.type='sine'; o.frequency.value=freq; o2.frequency.value=freq*1.5;
+    o.connect(g); o2.connect(g); g.connect(a.destination);
+    g.gain.setValueAtTime(vol,t); g.gain.setValueAtTime(vol,t+dur-0.03); g.gain.linearRampToValueAtTime(0,t+dur);
+    o.start(t); o2.start(t); o.stop(t+dur); o2.stop(t+dur);
   }catch(e){}
 }
-function beepKeikoStart(){
-  schedTone(880,0,1.5,1.0);
-}
-function beepPipPattern(){
-  // 880Hz・0.1秒×4連打→0.3秒休み を3セット
-  for(let i=0;i<4;i++) schedTone(880, i*0.1,        0.08, 1.0);
-  for(let i=0;i<4;i++) schedTone(880, 0.7+i*0.1,    0.08, 1.0);
-  for(let i=0;i<4;i++) schedTone(880, 1.4+i*0.1,    0.08, 1.0);
-}
-function beepFinish(){ beepPipPattern(); }
-function beepIntervalStart(){ beepPipPattern(); }
+function beepKeikoStart(){schedTone(880,0,1.5);}
+function beepPips(){for(let s=0;s<3;s++)for(let i=0;i<4;i++)schedTone(880,s*0.7+i*0.1,0.08);}
+const beepIntervalStart=beepPips, beepFinish=beepPips;
 
-// ===== TOAST =====
+// ===== UTIL =====
+function fmt2(s){return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');}
 let toastTimer=null;
-function showToast(msg,color){
-  const isDark=(theme==='dark');
-  const c=color||(isDark?'#64B5F6':'#1E78DC');
-  const t=document.getElementById('toast');
-  t.textContent=msg; t.style.color=t.style.borderColor=c;
-  t.style.boxShadow=`0 0 20px ${c}40`;
-  if(toastTimer)clearTimeout(toastTimer);
-  t.classList.remove('show');
-  requestAnimationFrame(()=>requestAnimationFrame(()=>{
-    t.classList.add('show');
-    toastTimer=setTimeout(()=>t.classList.remove('show'),2200);
-  }));
+function showToast(msg){
+  const t=document.getElementById('toast'); t.textContent=msg;
+  clearTimeout(toastTimer); t.classList.remove('show');
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{t.classList.add('show');toastTimer=setTimeout(()=>t.classList.remove('show'),2200);}));
+}
+function setTheme(t){
+  theme=t; document.documentElement.setAttribute('data-theme',t);
+  document.getElementById('theme-btn').textContent=t==='light'?'ダークモード':'ライトモード';
+  if(isRunning()) updateRunUI();
+}
+function toggleTheme(){setTheme(theme==='light'?'dark':'light');}
+function isRunning(){return timerState==='running'||timerState==='paused'||timerState==='waiting';}
+
+// ===== ROWS =====
+const ROW_DEFS=[
+  {key:'rounds',  ico:'🔁', cls:'ico-rounds',  label:'本数'},
+  {key:'keiko',   ico:'🥋', cls:'ico-keiko',   label:'稽古時間'},
+  {key:'interval',ico:'💤', cls:'ico-interval',label:'インターバル'}
+];
+function buildRows(id){
+  document.getElementById(id).innerHTML=ROW_DEFS.map(r=>
+    `<button class="row" onclick="openModal('${r.key}')">
+       <span class="row-label">${r.label}</span>
+       <span class="row-val" data-val="${r.key}"></span>
+       <span class="row-chev">›</span>
+     </button>`).join('');
+}
+function intervalText(){return manualInterval?'なし（手動）':fmt2(intervalMin*60+intervalSec);}
+function refreshRows(){
+  const v={rounds:repeatCount===null?'∞ 無限':repeatCount+' 本', keiko:fmt2(keikoMin*60+keikoSec), interval:intervalText()};
+  document.querySelectorAll('[data-val]').forEach(el=>el.textContent=v[el.dataset.val]);
+  const cv=document.getElementById('chip-val'); if(cv) cv.textContent=intervalText();
 }
 
 // ===== TABS =====
-function showTab(tab){
-  currentTab=tab;
-  ['timer','settings'].forEach(t=>document.getElementById('tab-'+t).classList.toggle('active',t===tab));
-  const running=(timerState==='running'||timerState==='paused'||timerState==='waiting');
-  document.getElementById('screen-idle').style.display    =(tab==='timer'&&!running)?'block':'none';
-  document.getElementById('screen-running').style.display =(tab==='timer'&&running) ?'flex' :'none';
-  document.getElementById('screen-settings').style.display=(tab==='settings')       ?'block':'none';
-  if(tab==='settings') renderSettings();
-  else updateIdleSummary();
-}
 function refreshView(){
-  const running=(timerState==='running'||timerState==='paused'||timerState==='waiting');
-  if(currentTab==='timer'){
-    document.getElementById('screen-idle').style.display    =running?'none':'block';
-    document.getElementById('screen-running').style.display =running?'flex':'none';
-    if(!running) updateIdleSummary();
-  }
+  const run=isRunning();
+  document.getElementById('screen-idle').style.display=run?'none':'flex';
+  document.getElementById('screen-running').style.display=run?'flex':'none';
+  refreshRows();
 }
 
-// ===== IDLE SUMMARY =====
-function fmt2(s){const m=Math.floor(s/60),sc=s%60;return`${String(m).padStart(2,'0')}:${String(sc).padStart(2,'0')}`;}
-function updateIdleSummary(){
-  document.getElementById('sum-rounds').textContent   =repeatCount===null?'∞ 無限':`${repeatCount} 本`;
-  document.getElementById('sum-keiko').textContent    =fmt2(keikoMin*60+keikoSec);
-  document.getElementById('sum-interval').textContent =manualInterval?'手動':fmt2(intervalMin*60+intervalSec);
+// ===== MODAL =====
+let pendingInit=[];
+function makeDrum(items,index,onChange,labelText,width){
+  const col=document.createElement('div'); col.className='picker-col';
+  if(labelText){const l=document.createElement('label'); l.textContent=labelText; col.appendChild(l);}
+  const wrap=document.createElement('div'); wrap.className='drum-wrap'; wrap.style.width=width+'px';
+  const sel=document.createElement('div'); sel.className='drum-sel';
+  const drum=document.createElement('div'); drum.className='drum';
+  const pad=()=>{const p=document.createElement('div'); p.style.height='48px'; return p;};
+  drum.appendChild(pad());
+  items.forEach((t,i)=>{const d=document.createElement('div'); d.className='drum-item'+(i===index?' center':''); d.textContent=t; drum.appendChild(d);});
+  drum.appendChild(pad());
+  wrap.appendChild(sel); wrap.appendChild(drum); col.appendChild(wrap);
+  pendingInit.push(()=>{drum.scrollTop=index*48;});
+  let tm=null;
+  drum.addEventListener('scroll',()=>{
+    clearTimeout(tm);
+    tm=setTimeout(()=>{
+      const v=Math.max(0,Math.min(items.length-1,Math.round(drum.scrollTop/48)));
+      drum.querySelectorAll('.drum-item').forEach((el,i)=>el.classList.toggle('center',i===v));
+      onChange(v);
+    },100);
+  });
+  return col;
 }
+const nums=n=>Array.from({length:n},(_,i)=>String(i).padStart(2,'0'));
+function timeDrums(min,sec,onChange){
+  let m=min,s=sec;
+  const row=document.createElement('div'); row.className='drum-row';
+  const colon=document.createElement('div'); colon.className='colon'; colon.textContent=':';
+  row.appendChild(makeDrum(nums(60),m,v=>{m=v;onChange(m,s);},'分',110));
+  row.appendChild(colon);
+  row.appendChild(makeDrum(nums(60),s,v=>{s=v;onChange(m,s);},'秒',110));
+  return row;
+}
+function openModal(kind){
+  const body=document.getElementById('sheet-body'); body.innerHTML=''; pendingInit=[];
+  const title=document.getElementById('sheet-title');
+  if(kind==='rounds'){
+    title.textContent='本数';
+    const items=['∞ 無限',...Array.from({length:100},(_,i)=>(i+1)+' 本')];
+    const row=document.createElement('div'); row.className='drum-row';
+    row.appendChild(makeDrum(items,repeatCount===null?0:repeatCount,v=>{repeatCount=v===0?null:v;refreshRows();},'',200));
+    body.appendChild(row);
+  } else if(kind==='keiko'){
+    title.textContent='稽古時間';
+    body.appendChild(timeDrums(keikoMin,keikoSec,(m,s)=>{keikoMin=m;keikoSec=s;refreshRows();}));
+  } else {
+    title.textContent='インターバル';
+    const seg=document.createElement('div'); seg.className='seg';
+    seg.innerHTML='<button id="seg-manual">なし（手動）</button><button id="seg-time">時間を指定</button>';
+    body.appendChild(seg);
+    const holder=document.createElement('div'); body.appendChild(holder);
+    const draw=()=>{
+      seg.querySelector('#seg-manual').classList.toggle('active',manualInterval);
+      seg.querySelector('#seg-time').classList.toggle('active',!manualInterval);
+      holder.innerHTML=''; pendingInit=[];
+      if(manualInterval){
+        const n=document.createElement('div'); n.style.cssText='text-align:center;color:var(--sub);font-size:14px;font-weight:600;line-height:1.7;padding:48px 0';
+        n.innerHTML='稽古が終わったら待機し、<br>画面をタップすると次の稽古が始まります';
+        holder.appendChild(n);
+      } else {
+        holder.appendChild(timeDrums(intervalMin,intervalSec,(m,s)=>{intervalMin=m;intervalSec=s;refreshRows();}));
+        requestAnimationFrame(()=>pendingInit.forEach(f=>f()));
+      }
+      refreshRows();
+    };
+    seg.querySelector('#seg-manual').onclick=()=>{manualInterval=true;draw();};
+    seg.querySelector('#seg-time').onclick=()=>{manualInterval=false;draw();};
+    draw();
+  }
+  document.getElementById('modal').classList.add('open');
+  requestAnimationFrame(()=>pendingInit.forEach(f=>f()));
+}
+function closeModal(){document.getElementById('modal').classList.remove('open'); refreshRows();}
 
 // ===== TIMER CORE =====
 function startTimer(){
-  if(timerState==='paused'){resumeTimer();return;}
-  currentRound=1; phase='keiko';
-  remainingSec=keikoMin*60+keikoSec;
-  timerState='running';
-  beepKeikoStart();
-  showToast('1 本目　稽古開始！');
+  getACtx();
+  currentRound=1; phase='keiko'; remainingSec=keikoMin*60+keikoSec; timerState='running';
+  beepKeikoStart(); showToast('1 本目　開始！');
   refreshView(); startTick(); updateRunUI();
 }
-function resumeTimer(){
-  if(timerState!=='paused')return;
-  timerState='running';
-  document.getElementById('pause-icon').textContent='⏸';
-  document.getElementById('pause-label').textContent='一時停止';
-  startTick();
-}
 function togglePause(){
-  if(timerState==='running'){
-    timerState='paused'; clearInterval(ticker); ticker=null;
-    document.getElementById('pause-icon').textContent='▶';
-    document.getElementById('pause-label').textContent='再開';
-  } else if(timerState==='paused'){resumeTimer();}
+  if(timerState==='waiting'){manualNext();return;}
+  if(timerState==='running'){timerState='paused'; clearInterval(ticker); ticker=null;}
+  else if(timerState==='paused'){timerState='running'; startTick();}
+  updateRunUI();
 }
-function stopTimer(){clearInterval(ticker);ticker=null;timerState='idle';refreshView();}
-function startTick(){clearInterval(ticker);ticker=setInterval(tick,1000);}
-function tick(){if(remainingSec>0){remainingSec--;updateRunUI();}else{onPhaseComplete();}}
-
+function stopTimer(){clearInterval(ticker); ticker=null; timerState='idle'; refreshView();}
+function startTick(){clearInterval(ticker); ticker=setInterval(tick,1000);}
+function tick(){if(remainingSec>0){remainingSec--; updateRunUI();} else onPhaseComplete();}
 function onPhaseComplete(){
   if(phase==='keiko'){
     if(manualInterval){
-      clearInterval(ticker);ticker=null;timerState='waiting';
-      beepIntervalStart();
-      showToast('インターバル（タップで次へ）','#C87800');
-      updateRunUI();
+      clearInterval(ticker); ticker=null; timerState='waiting';
+      beepIntervalStart(); showToast('インターバル（タップで次へ）'); updateRunUI();
     } else {
-      const iSec=intervalMin*60+intervalSec;
-      if(iSec>0){
-        phase='interval';remainingSec=iSec;
-        beepIntervalStart();showToast('インターバル','#C87800');updateRunUI();
-      } else {nextRound();}
+      const s=intervalMin*60+intervalSec;
+      if(s>0){phase='interval'; remainingSec=s; beepIntervalStart(); showToast('インターバル'); updateRunUI();}
+      else nextRound();
     }
-  } else {nextRound();}
+  } else nextRound();
 }
-function manualNext(){if(timerState!=='waiting')return;nextRound();}
+function manualNext(){if(timerState==='waiting') nextRound();}
 function nextRound(){
   const next=currentRound+1;
   if(repeatCount!==null&&next>repeatCount){
-    clearInterval(ticker);ticker=null;timerState='finished';
-    beepFinish();showToast('終了！お疲れ様でした','#2E9E5B');
-    setTimeout(()=>{timerState='idle';refreshView();},2000);
+    clearInterval(ticker); ticker=null; timerState='finished';
+    beepFinish(); showToast('終了！お疲れ様でした');
+    setTimeout(()=>{timerState='idle'; refreshView();},2000);
   } else {
-    currentRound=next;phase='keiko';
-    remainingSec=keikoMin*60+keikoSec;
-    timerState='running';startTick();
-    beepKeikoStart();showToast(`${currentRound} 本目　稽古開始！`);updateRunUI();
+    currentRound=next; phase='keiko'; remainingSec=keikoMin*60+keikoSec; timerState='running';
+    startTick(); beepKeikoStart(); showToast(currentRound+' 本目　開始！'); updateRunUI();
   }
 }
 
 // ===== RUNNING UI =====
 function updateRunUI(){
-  const waiting=(timerState==='waiting');
-  const isKeiko=(phase==='keiko');
-  const isDark=(theme==='dark');
-
-  // time
-  if(waiting){
-    document.getElementById('time-display').textContent='--:--';
-    document.getElementById('time-label').textContent='待機中';
-  } else {
-    const m=Math.floor(remainingSec/60),s=remainingSec%60;
-    document.getElementById('time-display').textContent=`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-    document.getElementById('time-label').textContent='残り時間';
+  const waiting=timerState==='waiting', isKeiko=phase==='keiko';
+  document.getElementById('time-display').textContent=waiting?'--:--':fmt2(remainingSec);
+  document.getElementById('time-label').textContent=waiting?'タップで次へ':'残り時間';
+  document.getElementById('round-main').textContent=currentRound+' 本目';
+  document.getElementById('round-ratio').textContent=repeatCount===null?'∞':currentRound+' / '+repeatCount;
+  const b=document.getElementById('phase-badge');
+  if(waiting){b.className='badge badge-interval'; b.textContent='インターバル（待機中）';}
+  else if(isKeiko){b.className='badge badge-keiko'; b.textContent='稽古中';}
+  else {b.className='badge badge-interval'; b.textContent='インターバル';}
+  document.getElementById('interval-chip').style.display=(isKeiko||waiting)&&!waiting?'':'none';
+  const pb=document.getElementById('btn-pause');
+  if(waiting){pb.className='big-btn btn-orange'; document.getElementById('pause-icon').textContent='▶'; document.getElementById('pause-label').textContent='次の稽古を開始';}
+  else {
+    pb.className='big-btn btn-blue';
+    document.getElementById('pause-icon').textContent=timerState==='paused'?'▶':'⏸';
+    document.getElementById('pause-label').textContent=timerState==='paused'?'再開':'一時停止';
   }
-
-  document.getElementById('round-main').textContent=`${currentRound} 本目`;
-  document.getElementById('round-ratio').textContent=repeatCount===null?'∞':`${currentRound} / ${repeatCount}`;
-
-  // phase badge
-  const badge=document.getElementById('phase-badge');
-  if(waiting){badge.className='phase-badge phase-waiting';badge.textContent='💤 インターバル中';}
-  else if(isKeiko){badge.className='phase-badge phase-keiko';badge.textContent='🥋 稽古中';}
-  else{badge.className='phase-badge phase-interval';badge.textContent='💤 インターバル';}
-
-  // interval chip
-  const chip=document.getElementById('interval-chip');
-  const chipLabel=document.getElementById('chip-label');
-  const chipVal=document.getElementById('chip-val');
-  if(manualInterval){
-    chipLabel.textContent='インターバル';chipVal.textContent='手動';
-  } else {
-    chipLabel.textContent='インターバル';chipVal.textContent=fmt2(intervalMin*60+intervalSec);
-  }
-  // hide chip during interval phase itself
-  chip.style.display=(isKeiko||waiting)?'':'none';
-
-  // tap overlay
-  document.getElementById('tap-overlay').style.display=waiting?'flex':'none';
-
-  // ring
-  const trackColor=isDark?'rgba(255,255,255,0.10)':'rgba(0,0,0,0.08)';
-  if(waiting){drawRing(0,false,true,trackColor);}
-  else{
-    const total=isKeiko?(keikoMin*60+keikoSec):(intervalMin*60+intervalSec);
-    drawRing(total>0?remainingSec/total:0,isKeiko,false,trackColor);
-  }
-
-  // pause btn
-  document.getElementById('btn-pause').style.opacity=waiting?'0.35':'1';
-  document.getElementById('btn-pause').style.pointerEvents=waiting?'none':'auto';
+  const total=isKeiko?keikoMin*60+keikoSec:intervalMin*60+intervalSec;
+  drawRing(waiting?0:(total>0?remainingSec/total:0),isKeiko,waiting);
 }
-
-function drawRing(prog,isKeiko,isWaiting,trackColor){
-  const c=document.getElementById('progress-canvas');
-  const ctx=c.getContext('2d');
-  const cx=105,cy=105,r=92;
-  ctx.clearRect(0,0,210,210);
-  ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);
-  ctx.strokeStyle=trackColor;ctx.lineWidth=8;ctx.stroke();
-  if(isWaiting){
-    ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);
-    ctx.strokeStyle=theme==='dark'?'rgba(255,183,77,0.25)':'rgba(200,120,0,0.2)';
-    ctx.lineWidth=8;ctx.stroke();return;
-  }
-  if(prog>0){
-    let color;
-    if(isKeiko) color=prog>0.35?(theme==='dark'?'#64B5F6':'#1E78DC'):'#EF5350';
-    else        color=prog>0.35?(theme==='dark'?'#FFB74D':'#E09000'):'#FF7043';
-    ctx.beginPath();ctx.arc(cx,cy,r,-Math.PI/2,-Math.PI/2+Math.PI*2*prog);
-    ctx.strokeStyle=color;ctx.lineWidth=8;ctx.lineCap='round';ctx.stroke();
+function drawRing(prog,isKeiko,waiting){
+  const c=document.getElementById('progress-canvas'), ctx=c.getContext('2d'), cs=getComputedStyle(document.documentElement);
+  const cx=220,cy=220,r=192;
+  ctx.clearRect(0,0,440,440);
+  ctx.lineWidth=22; ctx.lineCap='butt';
+  ctx.strokeStyle=waiting?cs.getPropertyValue('--orange').trim():cs.getPropertyValue('--track').trim();
+  if(waiting) ctx.globalAlpha=.35;
+  ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.stroke(); ctx.globalAlpha=1;
+  if(!waiting&&prog>0){
+    ctx.strokeStyle=isKeiko?(prog>0.2?cs.getPropertyValue('--blue').trim():cs.getPropertyValue('--red').trim()):cs.getPropertyValue('--orange').trim();
+    ctx.beginPath(); ctx.arc(cx,cy,r,-Math.PI/2,-Math.PI/2+Math.PI*2*prog); ctx.stroke();
   }
 }
+// 待機中にリングをタップでも次へ
+document.querySelector('.ring-wrap').addEventListener('click',manualNext);
 
-// ===== SETTINGS =====
-function renderSettings(){
-  renderRoundPicker();
-  renderSpinner('spinner-keiko',   keikoMin,   keikoSec,   (m,s)=>{keikoMin=m;   keikoSec=s;   updateIdleSummary();});
-  renderSpinner('spinner-interval',intervalMin, intervalSec,(m,s)=>{intervalMin=m; intervalSec=s; updateIdleSummary();});
-  document.getElementById('manual-toggle').checked=manualInterval;
-  document.getElementById('manual-note').style.display=manualInterval?'block':'none';
-  document.getElementById('interval-time-card').style.opacity=manualInterval?'0.35':'1';
-  document.getElementById('interval-time-card').style.pointerEvents=manualInterval?'none':'auto';
-  document.getElementById('theme-light').classList.toggle('active',theme==='light');
-  document.getElementById('theme-dark').classList.toggle('active',theme==='dark');
-}
-function onManualToggle(){
-  manualInterval=document.getElementById('manual-toggle').checked;
-  document.getElementById('manual-note').style.display=manualInterval?'block':'none';
-  document.getElementById('interval-time-card').style.opacity=manualInterval?'0.35':'1';
-  document.getElementById('interval-time-card').style.pointerEvents=manualInterval?'none':'auto';
-  updateIdleSummary();
-}
-
-// ── 本数ピッカー ──
-let roundScrollTimer=null;
-function renderRoundPicker(){
-  const list=document.getElementById('round-list');
-  list.innerHTML='';
-  const items=['∞ 無限',...Array.from({length:100},(_,i)=>`${i+1} 本`)];
-  items.forEach((label,i)=>{
-    const div=document.createElement('div');
-    div.className='round-item'+(i===(repeatCount===null?0:repeatCount)?' selected':'');
-    div.textContent=label;list.appendChild(div);
-  });
-  const selIdx=repeatCount===null?0:repeatCount;
-  list.scrollTop=selIdx*38;
-  list.onscroll=()=>{
-    clearTimeout(roundScrollTimer);
-    roundScrollTimer=setTimeout(()=>{
-      const idx=Math.round(list.scrollTop/38);
-      repeatCount=idx===0?null:idx;
-      document.querySelectorAll('.round-item').forEach((el,i)=>el.classList.toggle('selected',i===idx));
-      updateIdleSummary();
-    },80);
-  };
-}
-
-// ── ドラムロールピッカー ──
-function renderSpinner(containerId,initMin,initSec,onChange){
-  const wrap=document.getElementById(containerId);
-  wrap.innerHTML='';
-  let curMin=initMin,curSec=initSec;
-  function makeDrumUnit(labelText,initVal,count,onVal){
-    const col=document.createElement('div');col.className='picker-col';
-    const lbl=document.createElement('label');lbl.textContent=labelText;
-    const outer=document.createElement('div');outer.className='drum-wrap';
-    const sel=document.createElement('div');sel.className='drum-sel';
-    const drum=document.createElement('div');drum.className='picker-drum';
-    const padPx=44;
-    const p1=document.createElement('div');p1.style.height=padPx+'px';drum.appendChild(p1);
-    for(let i=0;i<count;i++){
-      const item=document.createElement('div');
-      item.className='drum-item'+(i===initVal?' center':'');
-      item.textContent=String(i).padStart(2,'0');
-      drum.appendChild(item);
-    }
-    const p2=document.createElement('div');p2.style.height=padPx+'px';drum.appendChild(p2);
-    outer.appendChild(sel);outer.appendChild(drum);
-    col.appendChild(lbl);col.appendChild(outer);
-    setTimeout(()=>{drum.scrollTop=initVal*44;},0);
-    let t=null;
-    drum.addEventListener('scroll',()=>{
-      clearTimeout(t);
-      t=setTimeout(()=>{
-        const val=Math.max(0,Math.min(count-1,Math.round(drum.scrollTop/44)));
-        drum.scrollTo({top:val*44,behavior:'smooth'});
-        drum.querySelectorAll('.drum-item').forEach((el,i)=>el.classList.toggle('center',i===val));
-        onVal(val);
-      },120);
-    });
-    return col;
-  }
-  const minCol=makeDrumUnit('分',curMin,60,v=>{curMin=v;onChange(curMin,curSec);});
-  const colon=document.createElement('div');colon.className='colon-sep';colon.textContent=':';
-  const secCol=makeDrumUnit('秒',curSec,60,v=>{curSec=v;onChange(curMin,curSec);});
-  wrap.appendChild(minCol);wrap.appendChild(colon);wrap.appendChild(secCol);
-}
+// iOS バウンス防止（ドラム内のスクロールだけ許可）
+document.addEventListener('touchmove',e=>{ if(!e.target.closest('.drum')) e.preventDefault(); },{passive:false});
 
 // ===== INIT =====
-updateIdleSummary();
-
-// ===== iOS Safari バウンススクロール防止 =====
-// タイマー画面（idle/running）ではtouchmoveをキャンセル
-// 設定画面内のスクロール要素（round-list, picker-drum）は通過させる
-document.addEventListener('touchmove', function(e){
-  // 設定画面が表示中はスキップ
-  if(currentTab === 'settings') return;
-  // スクロール可能な子要素の内側なら通過
-  const scrollable = e.target.closest('#round-list, .picker-drum');
-  if(scrollable) return;
-  e.preventDefault();
-}, { passive: false });
+buildRows('rows-idle'); refreshView();
 </script>
 </body>
 </html>
