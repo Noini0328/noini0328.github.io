@@ -27,7 +27,7 @@ button{font-family:inherit}
 .pw{--num:var(--wac);--bg:var(--wbg);--ac:var(--wac);--btn:var(--wbtn);--bt:var(--wbt);--hd:var(--whd);--ht:var(--wht)}
 .pg{--num:var(--gnum);--bg:var(--gbg);--ac:var(--gac);--btn:var(--gbtn);--bt:var(--gbt);--hd:var(--ghd);--ht:var(--ght)}
 .dv{width:2px;background:var(--bd)}
-.ph{cursor:pointer;background:var(--hd);color:var(--ht);text-align:center;font-size:clamp(18px,3.4vw,26px);font-weight:900;letter-spacing:8px;padding:6px 0}
+.ph{position:relative;text-indent:8px;cursor:pointer;background:var(--hd);color:var(--ht);text-align:center;font-size:clamp(18px,3.4vw,26px);font-weight:900;letter-spacing:8px;padding:6px 0}
 .bd{flex:1;display:flex;flex-direction:column;gap:4px;padding:4px;min-height:0}
 .rw{display:flex;gap:4px;min-height:0}
 .cd{position:relative;flex:1;border:2px solid var(--ac);border-radius:10px;background:var(--card);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;overflow:hidden;min-width:0;cursor:pointer}
@@ -45,7 +45,8 @@ button{font-family:inherit}
 .ip{flex:1;border:2px solid var(--ac);border-radius:10px;background:var(--btn);color:var(--bt);font-size:clamp(22px,5vw,34px);font-weight:900;letter-spacing:6px;cursor:pointer;position:relative;display:flex;align-items:center;justify-content:center}
 .ip:active{filter:brightness(.85)}.ip.off{opacity:.45}
 .ud{position:absolute;bottom:3px;left:4px;font-size:clamp(10px,1.6vw,13px);font-weight:700;letter-spacing:0;padding:3px 7px;border-radius:5px;border:1.5px solid var(--ac);background:var(--card);color:var(--ac);cursor:pointer;pointer-events:auto;z-index:2}
-.pkc{display:block;width:100%;margin-bottom:8px;padding:14px;border:2px solid rgba(0,0,0,.25);border-radius:10px;font-size:18px;font-weight:900;cursor:pointer}
+.ar{position:absolute;right:10px;top:50%;transform:translateY(-50%);letter-spacing:0;text-indent:0;font-size:.6em;opacity:.8}
+.pkc{position:relative;text-align:center;display:block;width:100%;margin-bottom:8px;padding:14px;border:2px solid rgba(0,0,0,.25);border-radius:10px;font-size:18px;font-weight:900;cursor:pointer}
 #ft{background:var(--hdr);display:flex;gap:6px;padding:8px 10px;min-height:84px;flex-shrink:0}
 #ft button{flex:1;border-radius:12px;border:2px solid rgba(255,255,255,.4);background:rgba(255,255,255,.12);color:#fff;font-size:clamp(14px,2.8vw,20px);font-weight:800;cursor:pointer}
 #ft button:disabled{opacity:.3;pointer-events:none}
@@ -114,7 +115,7 @@ function sub(k,t,e){e.stopPropagation();push();const p=S[k];
 function tv(k){const t=TH[S.col[k]],d=S.cfg.dark;
  return`--hd:${t.hd};--ht:${t.ht};--ac:${d?t.da:t.a};--bg:${d?t.bd:t.bl};--btn:${d?(t.bb||'#2b323d'):'#fff'};--bt:${d?(t.bk||'#fff'):t.bt};--num:${d?(t.nd||t.da):(t.nl||t.a)}`}
 let pk='w';
-function pick(k){pk=k;document.getElementById('pkb').innerHTML=Object.keys(TH).map(c=>{const t=TH[c];return`<button class="pkc" style="background:${t.hd};color:${t.ht}" onclick="setC('${c}')">${t.n}${S.col[k]==c?' ✓':''}</button>`}).join('');show('pk')}
+function pick(k){pk=k;document.getElementById('pkb').innerHTML=Object.keys(TH).map(c=>{const t=TH[c];return`<button class="pkc" style="background:${t.hd};color:${t.ht}" onclick="setC('${c}')">${t.n}${S.col[k]==c?'<span class="ar">✓</span>':''}</button>`}).join('');show('pk')}
 function setC(c){S.col[pk]=c;hide('pk');render()}
 function undo(){if(!H.length)return;const s=JSON.parse(H.pop());S.w=s.w;S.g=s.g;
  if(S.st=='finished'&&s.st!='finished'){S.rem=s.rem;S.st=s.st;if(S.st=='running')tick()}
@@ -142,7 +143,7 @@ function saveS(){S.cfg={...tmp};document.documentElement.dataset.theme=S.cfg.dar
 
 function panel(k){
  const p=S[k],a=adv(k),t=tot(k),ba=a-p.adv,bt=t-p.pts.reduce((x,y)=>x+y,0);
- return`<div class="ph" onclick="pick('${k}')">${N[k]} ▾</div><div class="bd">
+ return`<div class="ph" onclick="pick('${k}')">${N[k]}<span class="ar">▾</span></div><div class="bd">
  <div class="cd pc" style="flex:3"><div class="lb">ポイント</div><div class="vl">${t}</div><div class="sb">${bt?'ペナルティ +'+bt:''}</div>
  ${ud(k,'pt',p.pts.length)}<div class="pb">${[2,3,4].map(v=>`<button onclick="act('${k}','pt',${v})">+${v}</button>`).join('')}</div>
  </div>

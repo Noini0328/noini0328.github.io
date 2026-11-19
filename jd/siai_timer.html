@@ -64,7 +64,12 @@ body{background:var(--deep);color:var(--txt);
 .divider{width:2px;background:var(--border);flex-shrink:0}
 .phdr{padding:6px 4px;text-align:center;font-size:clamp(16px,3vw,24px);font-weight:900;
   letter-spacing:7px;flex-shrink:0;}
-.aka .phdr{background:var(--aka-dim);color:var(--aka)}
+.phdr{position:relative;text-indent:7px}
+.aka .phdr{background:var(--aka-hd,var(--aka));color:#fff;cursor:pointer}
+.ar{position:absolute;right:10px;top:50%;transform:translateY(-50%);letter-spacing:0;text-indent:0;font-size:.6em;opacity:.85}
+[data-aka=b]{--aka:#1565c0;--aka-bg:#e3f0fd;--aka-hd:#1565c0}
+[data-theme=dark][data-aka=b]{--aka:#64b5f6;--aka-bg:#0b1a2e;--aka-hd:#1565c0}
+.ckb{position:relative;display:block;width:100%;margin-bottom:8px;padding:14px;border:2px solid rgba(0,0,0,.25);border-radius:10px;font-size:18px;font-weight:900;color:#fff;text-align:center;cursor:pointer}
 .shiro .phdr{background:var(--shiro-dim);color:var(--shiro)}
 
 /* スコアエリア */
@@ -232,7 +237,7 @@ body{background:var(--deep);color:var(--txt);
   </div>
   <div class="divider"></div>
   <div class="panel aka" id="panel-aka">
-    <div class="phdr">赤</div>
+    <div class="phdr" onclick="pickAka()"><span id="aka-nm">赤</span><span class="ar">▾</span></div>
     <div class="scores" id="scores-aka"></div>
   </div>
 </div>
@@ -260,6 +265,9 @@ body{background:var(--deep);color:var(--txt);
 </div>
 
 <!-- リセット確認 -->
+<div class="modal-ov hidden" id="color-modal"><div class="modal"><h2>赤側の色</h2><div id="color-btns"></div>
+<div class="mact"><button class="btn-cancel" onclick="closeModal('color-modal')">閉じる</button></div></div></div>
+
 <div class="modal-ov hidden" id="reset-modal">
   <div class="modal">
     <h2>⚠️ リセット確認</h2>
@@ -460,7 +468,7 @@ function handleInvalid(){
   const lines=[];
   let ipponChanged=false;
   for(const side of['aka','shiro']){
-    const lbl=side==='aka'?'赤':'白';
+    const lbl=side==='aka'?akaName():'白';
     const cur=S[side],pre=prev[side];
     if(cur.ippon!==pre.ippon){lines.push(`${lbl} 一本: ${cur.ippon}→${pre.ippon}`);ipponChanged=true;}
     if(cur.wazaari!==pre.wazaari)lines.push(`${lbl} 技あり: ${cur.wazaari}→${pre.wazaari}`);
@@ -567,6 +575,13 @@ function toggleDark(){
   tmpDark=!tmpDark;
   document.getElementById('sw-dark').className='sw '+(tmpDark?'on':'off');
 }
+let akaBlue=false;const akaName=()=>akaBlue?'青':'赤';
+function pickAka(){
+  document.getElementById('color-btns').innerHTML=[[false,'赤','#c0202e'],[true,'青','#1565c0']].map(([b,n,c])=>
+    `<button class="ckb" style="background:${c}" onclick="setAka(${b})">${n}${akaBlue===b?'<span class="ar">✓</span>':''}</button>`).join('');
+  document.getElementById('color-modal').classList.remove('hidden');
+}
+function setAka(b){akaBlue=b;document.documentElement.dataset.aka=b?'b':'r';closeModal('color-modal');render();}
 function applyTheme(dark){
   document.documentElement.setAttribute('data-theme',dark?'dark':'light');
 }
@@ -612,7 +627,7 @@ function closeModal(id){document.getElementById(id).classList.add('hidden');}
 // ── 描画 ─────────────────────────────────────────
 function fmtT(s){return`${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;}
 
-function render(){renderHdr();renderPanel('shiro');renderPanel('aka');renderFooter();renderOsaePopup();}
+function render(){document.getElementById('aka-nm').textContent=akaName();renderHdr();renderPanel('shiro');renderPanel('aka');renderFooter();renderOsaePopup();}
 
 function renderOsaePopup(){
   const pop=document.getElementById('osae-global-popup');
@@ -650,7 +665,7 @@ function renderHdr(){
   const r=getResult();
   // 勝敗バッジ：完全塗りつぶしで見やすく
   const rm={
-    aka:  ['🔴 赤 勝ち', '#c62828', '#fff'],
+    aka:  akaBlue?['🔵 青 勝ち','#1565c0','#fff']:['🔴 赤 勝ち','#c62828','#fff'],
     shiro:['⚪ 白 勝ち', '#455a64', '#fff'],
     draw: ['引き分け',   '#e65100', '#fff'],
   };
@@ -674,8 +689,8 @@ function renderPanel(side){
   const isAka=side==='aka';
   // ライトモード用の色（赤側は赤、白側はネイビー）
   const isDark=S.cfg.dark;
-  const bc=isAka?'#c0202e':'#3949ab';
-  const bcD=isAka?'#e53935':'#cccccc';
+  const bc=isAka?(akaBlue?'#1565c0':'#c0202e'):'#3949ab';
+  const bcD=isAka?(akaBlue?'#64b5f6':'#e53935'):'#cccccc';
   const baseColor=isDark?bcD:bc;
   const p=S[side],c=S.cfg,cont=document.getElementById('scores-'+side);
 
