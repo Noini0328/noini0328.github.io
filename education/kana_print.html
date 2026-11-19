@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ひらがな・カタカナ・数字プリント生成</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Klee+One:wght@400;600&display=swap" rel="stylesheet">
+<style id="pageStyle">@page { size: A4 portrait; margin: 10mm; }</style>
+<style>
+  :root { --trace: #c8c8c8; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, "Hiragino Sans", "Yu Gothic UI", sans-serif; background: #e9ebef; color: #222; }
+  .ui { max-width: 1240px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 20px; margin: 4px 0 12px; }
+  .panel { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; }
+  .row + .row { margin-top: 10px; }
+  .lbl { font-size: 14px; color: #444; }
+  label { font-size: 14px; }
+  input[type=text], input[type=number], select { font-size: 15px; padding: 5px 8px; border: 1px solid #bbb; border-radius: 6px; }
+  input:disabled { background: #f0f0f0; color: #888; }
+  button { font-size: 14px; padding: 7px 12px; border: 1px solid #999; border-radius: 6px; background: #fafafa; cursor: pointer; }
+  button:hover { background: #eef; }
+  button.primary { background: #2b6cb0; color: #fff; border-color: #2b6cb0; }
+  button.primary:hover { background: #245a93; }
+  .seg { display: inline-flex; }
+  .seg button { border-radius: 0; }
+  .seg button + button { border-left: none; }
+  .seg button:first-child { border-radius: 6px 0 0 6px; }
+  .seg button:last-child { border-radius: 0 6px 6px 0; }
+  .seg button.on { background: #2b6cb0; color: #fff; border-color: #2b6cb0; }
+  .sep { width: 1px; height: 24px; background: #ddd; margin: 0 4px; }
+  .status { font-size: 14px; color: #2b6cb0; font-weight: bold; margin-left: auto; }
+  .copy { text-align: center; font-size: 12px; color: #777; padding: 8px 0 16px; }
+
+  /* ===== ページ（画面プレビュー＝印刷） ===== */
+  #pages { overflow-x: auto; }
+  .pv-label { text-align: center; font-size: 12px; color: #666; margin: 0 0 4px; }
+  .page { width: 210mm; height: 297mm; padding: 10mm; margin: 0 auto 18px; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.2); overflow: hidden; }
+  body.land .page { width: 297mm; height: 210mm; }
+  .page-inner { position: relative; width: 100%; height: 100%; }
+  .sheet-head { position: absolute; left: 0; right: 0; top: 0; height: 11mm; display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #333; padding-bottom: 1.5mm; font-family: "UD デジタル 教科書体 N-R","UD Digi Kyokasho N-R","Klee One",serif; }
+  .sheet-title { font-size: 18pt; }
+  .sheet-name { font-size: 13pt; }
+  .sheet-name span { display: inline-block; width: 14em; border-bottom: 1px solid #333; }
+
+  .cell { position: absolute; border: 0.35mm solid #222; display: flex; align-items: center; justify-content: center;
+    font-family: "UD デジタル 教科書体 N-R","UD Digi Kyokasho N-R","Klee One","Hiragino Mincho ProN","Yu Mincho",serif; line-height: 1; }
+  .cell.guide::before, .cell.guide::after { content: ""; position: absolute; }
+  .cell.guide::before { left: 50%; top: 0; bottom: 0; border-left: 0.25mm dashed #b8b8b8; }
+  .cell.guide::after { top: 50%; left: 0; right: 0; border-top: 0.25mm dashed #b8b8b8; }
+  .cell .tr { position: relative; z-index: 1; color: var(--trace); visibility: hidden; white-space: nowrap; }
+  body.trace .cell .tr { visibility: visible; }
+  .hint { position: absolute; display: flex; align-items: center; justify-content: center; color: #333; white-space: nowrap;
+    font-family: "UD デジタル 教科書体 N-R","UD Digi Kyokasho N-R","Klee One",sans-serif; line-height: 1; }
+  .hint.v { writing-mode: vertical-rl; }
+
+  @media print {
+    body { background: #fff; }
+    .ui > *:not(#pages) { display: none !important; }
+    .ui { max-width: none; padding: 0; }
+    .pv-label { display: none; }
+    .page { width: 190mm; height: 276mm; padding: 0; margin: 0; box-shadow: none; break-after: page; page-break-after: always; }
+    body.land .page { width: 277mm; height: 189mm; }
+    .page:last-child { break-after: auto; page-break-after: auto; }
+    .cell .tr, .cell.guide::before, .cell.guide::after { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+<div class="ui">
+  <h1>ひらがな・カタカナ・数字プリント生成</h1>
+
+  <div class="panel">
+    <div class="row">
+      <span class="lbl">印刷対象（複数選択可）</span>
+      <span class="seg" id="tgtSeg"><button data-v="hira">ひらがな</button><button data-v="kata">カタカナ</button><button data-v="num">数字</button></span>
+      <label class="lbl" id="numWrap">数字の最大 <input type="number" id="numMax" min="1" max="200" style="width:5em;"></label>
+      <label id="dakuWrap"><input type="checkbox" id="daku"> 濁音・半濁音も入れる</label>
+      <span class="status" id="status"></span>
+    </div>
+    <div class="row">
+      <span class="lbl">文字サイズ</span>
+      <label><input type="checkbox" id="autoSize" checked> 自動（A4に収まる最大）</label>
+      <input type="number" id="fsInput" min="10" max="400" step="2" style="width:6em;"> <span class="lbl">pt</span>
+      <span class="sep"></span>
+      <span class="lbl" id="hkWrap">かなのヒント
+        <select id="hintKana"><option value="none">なし</option><option value="roma">ローマ字</option><option value="other">もう一方のかな</option></select></span>
+      <span class="lbl" id="hnWrap">数字のヒント
+        <select id="hintNum"><option value="none">なし</option><option value="kan">漢数字</option><option value="dot">●の数（20まで）</option></select></span>
+      <label><input type="checkbox" id="guide" checked> 十字の補助線</label>
+    </div>
+    <div class="row">
+      <span class="lbl">モード</span>
+      <span class="seg" id="modeSeg"><button data-v="normal">通常</button><button data-v="trace">なぞりがき</button></span>
+      <span class="lbl">用紙</span>
+      <span class="seg" id="orSeg"><button data-v="port">A4縦</button><button data-v="land">A4横</button></span>
+      <span class="lbl">並べ方</span>
+      <span class="seg" id="arrSeg"><button data-v="v">縦（右から）</button><button data-v="h">横（左から）</button></span>
+      <span class="sep"></span>
+      <label class="lbl">タイトル <input type="text" id="titleInput" style="width:12em;"></label>
+      <button class="primary" id="printBtn">🖨 印刷</button>
+    </div>
+  </div>
+
+  <div id="pages"></div>
+  <footer class="copy">© 2026 K.S. — Released under the MIT License</footer>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  // ---------- データ ----------
+  // 1グループ＝5マス（あ行 あいうえお など）。' ' は空きマス
+  const HIRA = ['あいうえお','かきくけこ','さしすせそ','たちつてと','なにぬねの','はひふへほ','まみむめも','や ゆ よ','らりるれろ','わ を ん'];
+  const HIRA_D = ['がぎぐげご','ざじずぜぞ','だぢづでど','ばびぶべぼ','ぱぴぷぺぽ'];
+  const ROMA = ['a i u e o','ka ki ku ke ko','sa shi su se so','ta chi tsu te to','na ni nu ne no','ha hi fu he ho','ma mi mu me mo','ya - yu - yo','ra ri ru re ro','wa - wo - n'];
+  const ROMA_D = ['ga gi gu ge go','za ji zu ze zo','da ji zu de do','ba bi bu be bo','pa pi pu pe po'];
+  const toKata = s => s.replace(/[ぁ-ゖ]/g, c => String.fromCharCode(c.charCodeAt(0) + 0x60));
+  const KD = ['','一','二','三','四','五','六','七','八','九'];
+  function kansuji(n) {             // 1〜9999 を漢数字に
+    let s = '';
+    [[1000,'千'],[100,'百'],[10,'十']].forEach(([u, ch]) => {
+      const d = Math.floor(n / u) % 10;
+      if (d) s += (d === 1 ? '' : KD[d]) + ch;
+    });
+    return s + KD[n % 10];
+  }
+  const DOT_MAX = 20;               // ●のヒントを出す上限
+
+  const TITLES = { hira: 'ひらがなプリント', kata: 'カタカナプリント', num: 'すうじプリント' };
+  const TYPES = ['hira', 'kata', 'num'];
+  const NAMES = { hira: 'ひらがな', kata: 'カタカナ', num: '数字' };
+  const state = { targets: ['hira'], daku: false, numMax: 10, auto: true, fontSize: 72, hintKana: 'none', hintNum: 'none', guide: true,
+                  trace: false, land: true, arr: 'v', title: '' };
+  try { Object.assign(state, JSON.parse(localStorage.getItem('kanaPrintState') || '{}')); } catch (e) {}
+  if (!Array.isArray(state.targets) || !state.targets.length) state.targets = ['hira'];
+  const save = () => { try { localStorage.setItem('kanaPrintState', JSON.stringify(state)); } catch (e) {} };
+
+  // 種類 t のヒント設定（'none' | 'roma' | 'kata' | 'hira' | 'kan' | 'dot'）
+  function hintOf(t) {
+    if (t === 'num') return state.hintNum;
+    if (state.hintKana === 'other') return t === 'hira' ? 'kata' : 'hira';
+    return state.hintKana;
+  }
+  // かな：グループ（5マス）ごとの {c:文字, h:ヒント}
+  function kanaGroups(t) {
+    const h = hintOf(t);
+    const rows = state.daku ? HIRA.concat(HIRA_D) : HIRA;
+    const roma = state.daku ? ROMA.concat(ROMA_D) : ROMA;
+    return rows.map((r, gi) => {
+      const rs = roma[gi].split(' ');
+      return Array.from(r).map((ch, i) => {
+        if (ch === ' ') return null;
+        const c = t === 'kata' ? toKata(ch) : ch;
+        let hint = '';
+        if (h === 'roma') hint = rs[i];
+        if (h === 'kata') hint = toKata(ch);
+        if (h === 'hira') hint = ch;
+        return { c, h: hint };
+      });
+    });
+  }
+  // 数字：1〜最大値の {c, h}
+  function numItems() {
+    const h = state.hintNum, out = [];
+    for (let i = 1; i <= state.numMax; i++) {
+      let hint = '';
+      if (h === 'kan') hint = kansuji(i);
+      if (h === 'dot' && i <= DOT_MAX) hint = '●'.repeat(i);
+      out.push({ c: String(i), h: hint });
+    }
+    return out;
+  }
+
+  // ---------- 組版（mm単位で配置） ----------
+  const PT2MM = 25.4 / 72;
+  const FONT_RATIO = 0.78;   // マスに対する文字の大きさ
+  const HEAD = 15;           // 見出し（タイトル・名前）の高さ mm
+  const S = 5;               // かな1グループのマス数
+  const GR = 0.18;           // かなのグループ間のすき間（マス比）
+  const BGR = 0.45;          // 段と段の間（マス比）
+  const NG = 0.15;           // 数字の段どうしの間（マス比）
+
+  /*
+    考え方：ページを「段（band）」の積み重ねで作る。
+      across = 段の中で並ぶ方向、along = 段を積み重ねる方向
+      縦並び(V)：段は上から下へ積む。かなの段＝右から左へ縦5マスの列が並ぶ／数字の段＝左から右へ1行
+      横並び(H)：段は左から右へ積む。かなの段＝上から下へ横5マスの行が並ぶ／数字の段＝上から下へ1列
+    数字は「1段に何個並べるか」を自由に変えられるので、紙の形に合わせて向きを最適化する。
+  */
+  function layout() {
+    const L = state.land, V = state.arr === 'v';
+    document.body.classList.toggle('land', L);
+    document.body.classList.toggle('trace', state.trace);
+    $('pageStyle').textContent = `@page { size: A4 ${L ? 'landscape' : 'portrait'}; margin: 10mm; }`;
+
+    const AW = L ? 277 : 190, AH = (L ? 188 : 275) - HEAD;
+    const across = V ? AW : AH, along = V ? AH : AW;
+    const kanaHR = h => h === 'none' ? 0 : (V && h === 'roma' ? 0.55 : 0.32);
+    const numHR = () => state.hintNum === 'none' ? 0 : 0.32;
+
+    const types = TYPES.filter(t => state.targets.includes(t)).map(t =>
+      t === 'num' ? { t, kind: 'num', hint: state.hintNum, items: numItems(), HR: numHR() }
+                  : { t, kind: 'kana', hint: hintOf(t), groups: kanaGroups(t), HR: kanaHR(hintOf(t)) });
+
+    // 段の大きさ（マス単位）
+    const kAcross = (n, HR) => n * (1 + HR + GR) - GR;        // かな n グループ
+    const kAlong = () => S;
+    const nAcross = (n, HR) => V ? n : n * (1 + HR);           // 数字 n 個
+    const nAlong = HR => V ? 1 + HR : 1;
+    // 段 k 本を積んだ along 方向の長さ（マス単位）
+    const stackAlong = (k, one, gap) => k * one + (k - 1) * gap;
+
+    const mkKanaBands = (ty, per) => { const b = []; for (let i = 0; i < ty.groups.length; i += per) b.push({ ty, list: ty.groups.slice(i, i + per) }); return b; };
+    const mkNumBands = (ty, per) => { const b = []; for (let i = 0; i < ty.items.length; i += per) b.push({ ty, list: ty.items.slice(i, i + per) }); return b; };
+
+    const blocks = [];   // 1ページ分：{ cell, bands }
+    if (state.auto) {
+      // 種類ごとに1ページ。段の数を変えて、いちばん大きくなる組み方を選ぶ
+      types.forEach(ty => {
+        const total = ty.kind === 'kana' ? ty.groups.length : ty.items.length;
+        let best = { cell: 0, k: 1 };
+        for (let k = 1; k <= total; k++) {
+          const per = Math.ceil(total / k);
+          const c = ty.kind === 'kana'
+            ? Math.min(across / kAcross(per, ty.HR), along / stackAlong(k, kAlong(), BGR))
+            : Math.min(across / nAcross(per, ty.HR), along / stackAlong(k, nAlong(ty.HR), NG));
+          if (c > best.cell + 0.05) best = { cell: c, k };
+        }
+        const per = Math.ceil(total / best.k);
+        blocks.push({ cell: Math.floor(best.cell * 10) / 10, bands: ty.kind === 'kana' ? mkKanaBands(ty, per) : mkNumBands(ty, per) });
+      });
+    } else {
+      // 指定サイズ：全種類を同じ大きさで、入るだけ1枚に詰める（種類が変わると段を改める）
+      let cell = state.fontSize * PT2MM / FONT_RATIO;
+      types.forEach(ty => {   // 少なくとも1段は入る大きさに抑える
+        cell = Math.min(cell, ty.kind === 'kana' ? Math.min(across / kAcross(1, ty.HR), along / kAlong())
+                                                 : Math.min(across / nAcross(1, ty.HR), along / nAlong(ty.HR)));
+      });
+      cell = Math.floor(cell * 10) / 10;
+      const bands = [];
+      types.forEach(ty => {
+        if (ty.kind === 'kana') {
+          const per = Math.max(1, Math.floor((across / cell + GR) / (1 + ty.HR + GR) + 1e-6));
+          bands.push(...mkKanaBands(ty, per));
+        } else {
+          const per = Math.max(1, Math.floor(across / cell / (V ? 1 : 1 + ty.HR) + 1e-6));
+          bands.push(...mkNumBands(ty, per));
+        }
+      });
+      // ページに詰める
+      let cur = [], used = 0;
+      bands.forEach(b => {
+        const ext = (b.ty.kind === 'kana' ? kAlong() : nAlong(b.ty.HR)) * cell;
+        const gap = cur.length ? (cur[cur.length - 1].ty.kind === 'num' && b.ty.kind === 'num' ? NG : BGR) * cell : 0;
+        if (cur.length && used + gap + ext > along + 1e-6) { blocks.push({ cell, bands: cur }); cur = []; used = 0; }
+        used += (cur.length ? gap : 0) + ext;
+        cur.push(b);
+      });
+      if (cur.length) blocks.push({ cell, bands: cur });
+    }
+
+    // ---- 描画 ----
+    const pagesHTML = blocks.map(({ cell, bands }) => {
+      const fontMM = cell * FONT_RATIO;
+      // 段ごとの大きさ（mm）
+      const meta = bands.map(b => b.ty.kind === 'kana'
+        ? { ac: kAcross(b.list.length, b.ty.HR) * cell, al: kAlong() * cell }
+        : { ac: nAcross(b.list.length, b.ty.HR) * cell, al: nAlong(b.ty.HR) * cell });
+      const usedAcross = Math.max(...meta.map(m => m.ac));
+      let usedAlong = 0;
+      const pos = bands.map((b, i) => {
+        if (i) usedAlong += (bands[i - 1].ty.kind === 'num' && b.ty.kind === 'num' ? NG : BGR) * cell;
+        const p = usedAlong; usedAlong += meta[i].al; return p;
+      });
+      const offX = V ? (AW - usedAcross) / 2 : (AW - usedAlong) / 2;
+      const offY = HEAD + (V ? (AH - usedAlong) / 2 : (AH - usedAcross) / 2);
+
+      let out = '';
+      const cellDiv = (x, y, c) => {
+        const d = c.length; const fs = d >= 3 ? fontMM * 0.5 : d === 2 ? fontMM * 0.72 : fontMM;
+        return `<div class="cell${state.guide ? ' guide' : ''}" style="left:${x}mm;top:${y}mm;width:${cell + 0.35}mm;height:${cell + 0.35}mm">` +
+               `<span class="tr" style="font-size:${fs}mm;${d >= 2 ? 'letter-spacing:-0.06em;' : ''}">${esc(c)}</span></div>`;
+      };
+      const hintDiv = (x, y, w, h, text, hint, vert) => {
+        const len = Array.from(text).length, isDot = hint === 'dot';
+        const thick = Math.min(w, h), long = Math.max(w, h);
+        let fs = Math.min(thick * 0.62, cell * 0.24);
+        if (isDot || len > 2) fs = Math.min(fs, long * 0.95 / len * (hint === 'roma' ? 1.7 : 1));
+        return `<div class="hint${vert ? ' v' : ''}" style="left:${x}mm;top:${y}mm;width:${w}mm;height:${h}mm;font-size:${fs}mm;${isDot ? 'letter-spacing:-0.1em;' : ''}">${esc(text)}</div>`;
+      };
+
+      bands.forEach((b, bi) => {
+        const HR = b.ty.HR, hw = HR * cell, p = pos[bi], hasH = b.ty.hint !== 'none' && hw > 0;
+        if (b.ty.kind === 'kana') {
+          const unit = (1 + HR + GR) * cell;
+          b.list.forEach((grp, gi) => grp.forEach((it, si) => {
+            if (!it) return;
+            if (V) {   // 列を右から左へ。ヒントはマスの右
+              const hx = offX + usedAcross - gi * unit - hw, x = hx - cell, y = offY + p + si * cell;
+              out += cellDiv(x, y, it.c);
+              if (hasH && it.h) out += hintDiv(hx, y, hw, cell, it.h, b.ty.hint, b.ty.hint !== 'roma');
+            } else {   // 行を上から下へ。ヒントはマスの上
+              const hy = offY + gi * unit, y = hy + hw, x = offX + p + si * cell;
+              out += cellDiv(x, y, it.c);
+              if (hasH && it.h) out += hintDiv(x, hy, cell, hw, it.h, b.ty.hint, false);
+            }
+          }));
+        } else {
+          const n = b.list.length;
+          b.list.forEach((it, i) => {
+            let x, hy;
+            if (V) {   // 1行：左から右へ（中央寄せ）。ヒントはマスの上
+              x = offX + (usedAcross - n * cell) / 2 + i * cell; hy = offY + p;
+            } else {   // 1列：上から下へ（中央寄せ）。ヒントはマスの上
+              x = offX + p; hy = offY + (usedAcross - n * (1 + HR) * cell) / 2 + i * (1 + HR) * cell;
+            }
+            out += cellDiv(x, hy + hw, it.c);
+            if (hasH && it.h) out += hintDiv(x, hy, cell, hw, it.h, b.ty.hint, false);
+          });
+        }
+      });
+      const ts = [...new Set(bands.map(b => b.ty.t))];
+      const title = state.title || (ts.length === 1 ? TITLES[ts[0]] : ts.map(t => NAMES[t]).join('・') + 'プリント');
+      return `<div class="page-inner"><div class="sheet-head"><div class="sheet-title">${esc(title)}</div><div class="sheet-name">名前 <span>&nbsp;</span></div></div>${out}</div>`;
+    });
+
+    const N = pagesHTML.length;
+    $('pages').innerHTML = pagesHTML.map((pg, pi) => `<div class="pv-label">${pi + 1} / ${N} ページ</div><div class="page">${pg}</div>`).join('');
+    const ptOf = c => Math.round(c * FONT_RATIO / PT2MM);
+    const total = types.reduce((a, ty) => a + (ty.kind === 'num' ? ty.items.length : ty.groups.flat().filter(Boolean).length), 0);
+    let sizeInfo;
+    if (state.auto) {
+      sizeInfo = types.map((ty, i) => `${NAMES[ty.t]} 約${ptOf(blocks[i].cell)}pt`).join('・');
+      $('fsInput').value = ptOf(blocks[blocks.length - 1].cell);
+    } else {
+      const pt = ptOf(blocks[0].cell);
+      sizeInfo = `文字 約${pt}pt` + (pt < state.fontSize - 1 ? '（用紙に収まる最大に調整）' : '');
+    }
+    $('status').textContent = `${total} 文字 ／ A4${L ? '横' : '縦'} ${N} ページ ／ ${sizeInfo}`;
+  }
+
+  // ---------- UI ----------
+  function seg(id, key, map) {
+    const el = $(id);
+    const sync = () => el.querySelectorAll('button').forEach(b => b.classList.toggle('on', String(map ? map.to(state[key]) : state[key]) === b.dataset.v));
+    el.addEventListener('click', e => {
+      const v = e.target.dataset.v; if (v == null) return;
+      state[key] = map ? map.from(v) : v;
+      syncAll(); layout(); save();
+    });
+    return sync;
+  }
+  const bool = (t, f) => ({ to: x => x ? t : f, from: v => v === t });
+  const syncs = [
+    seg('modeSeg', 'trace', bool('trace', 'normal')),
+    seg('orSeg', 'land', bool('land', 'port')),
+    seg('arrSeg', 'arr'),
+  ];
+  // 印刷対象：複数選択（最後の1つは外せない）
+  $('tgtSeg').addEventListener('click', e => {
+    const v = e.target.dataset.v; if (!v) return;
+    const on = state.targets.includes(v);
+    if (on && state.targets.length === 1) return;
+    state.targets = on ? state.targets.filter(x => x !== v) : state.targets.concat(v);
+    syncAll(); layout(); save();
+  });
+  function syncAll() {
+    syncs.forEach(f => f());
+    $('tgtSeg').querySelectorAll('button').forEach(b => b.classList.toggle('on', state.targets.includes(b.dataset.v)));
+    const kana = state.targets.some(t => t !== 'num'), num = state.targets.includes('num');
+    $('hkWrap').style.display = kana ? '' : 'none';
+    $('hnWrap').style.display = num ? '' : 'none';
+    $('hintKana').value = state.hintKana; $('hintNum').value = state.hintNum;
+    $('daku').checked = state.daku;
+    $('dakuWrap').style.display = kana ? '' : 'none';
+    $('numWrap').style.display = num ? '' : 'none';
+    $('numMax').value = state.numMax;
+    $('autoSize').checked = state.auto;
+    $('fsInput').disabled = state.auto;
+    if (!state.auto) $('fsInput').value = state.fontSize;
+    $('guide').checked = state.guide;
+    $('titleInput').value = state.title;
+    $('titleInput').placeholder = '空欄なら種類ごとの名前';
+  }
+  $('daku').onchange = e => { state.daku = e.target.checked; layout(); save(); };
+  $('autoSize').onchange = e => {
+    state.auto = e.target.checked;
+    if (!state.auto) state.fontSize = parseFloat($('fsInput').value) || state.fontSize;
+    syncAll(); layout(); save();
+  };
+  let timer;
+  $('fsInput').oninput = e => {
+    const v = parseFloat(e.target.value);
+    if (v >= 8 && v <= 600) { state.fontSize = v; clearTimeout(timer); timer = setTimeout(() => { layout(); save(); }, 150); }
+  };
+  $('hintKana').onchange = e => { state.hintKana = e.target.value; layout(); save(); };
+  $('numMax').oninput = e => {
+    const v = parseInt(e.target.value, 10);
+    if (v >= 1 && v <= 200) { state.numMax = v; clearTimeout(timer); timer = setTimeout(() => { layout(); save(); }, 200); }
+  };
+  $('hintNum').onchange = e => { state.hintNum = e.target.value; layout(); save(); };
+  $('guide').onchange = e => { state.guide = e.target.checked; layout(); save(); };
+  $('titleInput').oninput = e => { state.title = e.target.value; clearTimeout(timer); timer = setTimeout(() => { layout(); save(); }, 150); };
+  $('printBtn').onclick = () => window.print();
+
+  syncAll(); layout();
+})();
+</script>
+</body>
+</html>
