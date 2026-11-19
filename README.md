@@ -6,7 +6,9 @@
 
 [試合タイマー](https://noini0328.github.io/jd/siai_timer.html)
 
-## bayes（ベイズ定理）
+## Informatics（情報学）
+
+### bayes（ベイズ定理）
 
 [ベイズ定理 電卓 — がん検診の的中率](https://noini0328.github.io/Informatics/bayes/bayes_cancer_screening.html)
 
