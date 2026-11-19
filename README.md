@@ -8,11 +8,11 @@
 
 ## bayes（ベイズ定理）
 
-[ベイズ定理 電卓 — がん検診の的中率](https://noini0328.github.io/bayes/bayes_cancer_screening.html)
+[ベイズ定理 電卓 — がん検診の的中率](https://noini0328.github.io/Informatics/bayes/bayes_cancer_screening.html)
 
-[ベイズ証拠シミュレーター - 検察官の誤謬問題](https://noini0328.github.io/bayes/BayesianEvidenceSimulator.html)
+[ベイズ証拠シミュレーター - 検察官の誤謬問題](https://noini0328.github.io/Informatics/bayes/BayesianEvidenceSimulator.html)
 
-[モンティホール問題の可視化](https://noini0328.github.io/bayes/monty_hall_convergence.html)
+[モンティホール問題の可視化](https://noini0328.github.io/Informatics/bayes/monty_hall_convergence.html)
 
 ## education（子供の教育）
 
