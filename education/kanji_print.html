@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>漢字プリント生成</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Klee+One:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root { --fs: 48pt; --trace: #c8c8c8; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, "Hiragino Sans", "Yu Gothic UI", sans-serif; background: #e9ebef; color: #222; }
+  .ui { max-width: 1100px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 20px; margin: 4px 0 12px; }
+  .panel { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  label { font-size: 14px; }
+  input[type=text], input[type=number] { font-size: 18px; padding: 6px 8px; border: 1px solid #bbb; border-radius: 6px; }
+  #mainInput { flex: 1; min-width: 280px; font-size: 22px; }
+  button { font-size: 14px; padding: 7px 12px; border: 1px solid #999; border-radius: 6px; background: #fafafa; cursor: pointer; }
+  button:hover { background: #eef; }
+  button.primary { background: #2b6cb0; color: #fff; border-color: #2b6cb0; }
+  button.primary:hover { background: #245a93; }
+  .seg { display: inline-flex; }
+  .seg button { border-radius: 0; }
+  .seg button:first-child { border-radius: 6px 0 0 6px; }
+  .seg button:last-child { border-radius: 0 6px 6px 0; border-left: none; }
+  .seg button.on { background: #2b6cb0; color: #fff; border-color: #2b6cb0; }
+  .hint { font-size: 12.5px; color: #666; margin-top: 6px; line-height: 1.6; }
+  #readingPanel { display: none; border-color: #e0a800; background: #fffbea; }
+  #readingPanel .rp-item { display: inline-flex; align-items: center; gap: 6px; margin: 4px 12px 4px 0; }
+  #readingPanel .rp-kanji { font-size: 22px; font-weight: bold; }
+  #readingPanel input { width: 9em; }
+  .status { font-size: 14px; color: #2b6cb0; font-weight: bold; margin-left: auto; }
+
+  /* 問題一覧（編集用） */
+  #itemList { display: flex; flex-wrap: wrap; gap: 6px; }
+  .it { display: inline-flex; align-items: center; gap: 4px; border: 1px solid #ccd; border-radius: 6px; padding: 3px 4px 3px 8px; background: #f7f9fc; font-size: 15px; }
+  .it .n { color: #888; font-size: 12px; }
+  .it .k { color: #2b6cb0; font-weight: bold; }
+  .it button { padding: 1px 6px; font-size: 12px; }
+  .empty { color: #888; font-size: 14px; }
+
+  /* ===== プリント（画面プレビュー＝印刷と同じページ割り） ===== */
+  .pv-label { text-align: center; font-size: 12px; color: #666; margin: 0 0 4px; }
+  .page {
+    width: 210mm; height: 297mm; padding: 10mm; margin: 0 auto 18px;
+    background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.2); overflow: hidden;
+  }
+  .page-inner { width: 190mm; }
+  .sheet-head { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #333; padding-bottom: 6px; margin-bottom: 4mm; font-family: "UD デジタル 教科書体 N-R","UD Digi Kyokasho N-R","Klee One",serif; }
+  .sheet-title { font-size: 20pt; }
+  .sheet-name { font-size: 13pt; }
+  .sheet-name span { display: inline-block; width: 14em; border-bottom: 1px solid #333; }
+
+  .txt {
+    font-family: "UD デジタル 教科書体 N-R","UD Digi Kyokasho N-R","Klee One","Hiragino Mincho ProN","Yu Mincho",serif;
+    font-size: var(--fs); line-height: 1.45;
+  }
+  .line { white-space: nowrap; }
+  .u { display: inline-block; white-space: nowrap; vertical-align: baseline; }
+  .u.qs { margin-left: 0.6em; }      /* 問題と問題の間 */
+  .line > .u:first-child { margin-left: 0; }
+  .q-num { font-family: system-ui, sans-serif; font-size: 0.32em; vertical-align: 0.2em; margin-right: 0.3em; color: #333; }
+  .box { display: inline-block; vertical-align: baseline; margin: 0 0.04em; text-align: center; }
+  .box .rt { display: flex; justify-content: space-around; font-size: 0.4em; line-height: 1.25; height: 1.25em; padding: 0 0.3em; }
+  .box .fr { display: block; height: 1.2em; line-height: 1.2em; border: 0.035em solid #222; }
+  .box .tr { color: var(--trace); visibility: hidden; }
+  body.trace .box .tr { visibility: visible; }
+  #measure { position: absolute; left: -9999px; top: 0; visibility: hidden; white-space: nowrap; }
+  #measureLines { position: absolute; left: -9999px; top: 0; visibility: hidden; width: 190mm; }
+
+  .copy { text-align: center; font-size: 12px; color: #777; padding: 8px 0 16px; }
+  @page { size: A4 portrait; margin: 10mm; }
+  @media print {
+    body { background: #fff; }
+    .ui > *:not(#pages) { display: none !important; }
+    .ui { max-width: none; padding: 0; }
+    .pv-label { display: none; }
+    .page { width: 190mm; height: 276mm; padding: 0; margin: 0; box-shadow: none; break-after: page; page-break-after: always; }
+    .page:last-child { break-after: auto; page-break-after: auto; }
+    .box .tr { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+<div class="ui">
+  <h1>漢字プリント生成</h1>
+
+  <div class="panel">
+    <div class="row">
+      <input type="text" id="mainInput" placeholder="例：誇りと使命感（Enterで追加）" autocomplete="off">
+      <button class="primary" id="addBtn">追加</button>
+    </div>
+    <div class="hint">
+      Enterを押すと、ひらがな・カタカナ以外の漢字部分が問題になります。続けて読み（ふりがな）を入力 → Enter で問題が追加され、入力欄に戻ります。<br>
+      読みを最初から指定する場合：<code>誇[ほこ]りと使命感[しめいかん]</code> または <code>使命感（しめいかん）</code> の形式で入力できます。
+    </div>
+  </div>
+
+  <div class="panel" id="readingPanel">
+    <div style="font-size:14px;margin-bottom:4px;">読みを入力してください（Enterで次へ／最後のEnterで追加、Escでキャンセル）</div>
+    <div id="readingFields"></div>
+  </div>
+
+  <div class="panel">
+    <div class="row">
+      <label>タイトル <input type="text" id="titleInput" style="width:14em;font-size:15px;"></label>
+      <label>文字サイズ <input type="number" id="fsInput" min="12" max="120" step="2" style="width:5em;font-size:15px;"> pt</label>
+      <span class="status" id="status"></span>
+    </div>
+    <div class="row" style="margin-top:10px;">
+      <span style="font-size:14px;">モード</span>
+      <span class="seg"><button id="modeNormal" class="on">通常</button><button id="modeTrace">なぞりがき</button></span>
+      <button class="primary" id="printBtn">🖨 印刷</button>
+      <span style="width:16px;"></span>
+      <button id="saveBtn">問題保存</button>
+      <button id="loadBtn">問題読込み</button>
+      <input type="file" id="fileInput" accept=".json,application/json" style="display:none">
+      <button id="clearBtn">全削除</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div style="font-size:13px;color:#555;margin-bottom:6px;">問題一覧（並べ替え・編集・削除）</div>
+    <div id="itemList"></div>
+  </div>
+
+  <div id="pages"></div>
+  <footer class="copy">© 2026 K.S. — Released under the MIT License</footer>
+</div>
+
+<div id="measure" class="txt"></div>
+<div id="measureLines"></div>
+
+<script>
+(() => {
+  const KANJI = /[\p{Script=Han}々〆〇ヶ]/u;
+  // 行頭に来てはいけない文字（前の文字にくっつける）
+  const NO_HEAD = /[、。，．,.・ー〜」』）)】〕！？!?ぁぃぅぇぉっゃゅょゎァィゥェォッャュョヮヵ]/;
+  const DEFAULT_ITEMS = [{ segments: [{ t: 'q', s: '誇', r: 'ほこ' }, { t: 'text', s: 'りと' }, { t: 'q', s: '使命感', r: 'しめいかん' }] }];
+  const state = { title: '漢字プリント', fontSize: 48, trace: false, items: JSON.parse(JSON.stringify(DEFAULT_ITEMS)) };
+  let pending = null;
+
+  const $ = id => document.getElementById(id);
+  const mainInput = $('mainInput');
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  // ---------- 解析 ----------
+  function parse(text) {
+    const segs = [], chars = Array.from(text);
+    let i = 0, buf = '';
+    const flush = () => { if (buf) { segs.push({ t: 'text', s: buf }); buf = ''; } };
+    const closeMap = { '[': ']', '［': '］', '(': ')', '（': '）' };
+    while (i < chars.length) {
+      if (KANJI.test(chars[i])) {
+        flush();
+        let k = '', r = '';
+        while (i < chars.length && KANJI.test(chars[i])) k += chars[i++];
+        const close = closeMap[chars[i]];
+        if (close) {
+          let j = i + 1, tmp = '';
+          while (j < chars.length && chars[j] !== close) tmp += chars[j++];
+          if (j < chars.length && tmp && !KANJI.test(tmp)) { r = tmp.trim(); i = j + 1; }
+        }
+        segs.push({ t: 'q', s: k, r });
+      } else buf += chars[i++];
+    }
+    flush();
+    return segs;
+  }
+  const toNotation = segs => segs.map(g => g.t === 'q' ? `${g.s}[${g.r}]` : g.s).join('');
+
+  // ---------- 入力 ----------
+  function submitMain() {
+    const text = mainInput.value.trim();
+    if (!text) return;
+    const segs = parse(text);
+    const missing = segs.filter(g => g.t === 'q' && !g.r);
+    if (!missing.length) { commit(segs); return; }
+    pending = segs;
+    const box = $('readingFields');
+    box.innerHTML = '';
+    missing.forEach((g, idx) => {
+      const wrap = document.createElement('span');
+      wrap.className = 'rp-item';
+      wrap.innerHTML = `<span class="rp-kanji">${esc(g.s)}</span><input type="text" autocomplete="off">`;
+      const inp = wrap.querySelector('input');
+      inp.addEventListener('keydown', e => {
+        if (e.isComposing || e.keyCode === 229) return;
+        if (e.key === 'Escape') { cancelReading(); return; }
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        const inputs = box.querySelectorAll('input');
+        if (idx < inputs.length - 1) inputs[idx + 1].focus(); else finishReading();
+      });
+      g._inp = inp;
+      box.appendChild(wrap);
+    });
+    $('readingPanel').style.display = 'block';
+    missing[0]._inp.focus();
+  }
+  function finishReading() {
+    if (!pending) return;
+    pending.forEach(g => { if (g._inp) { g.r = g._inp.value.trim(); delete g._inp; } });
+    commit(pending);
+  }
+  function cancelReading() { pending = null; $('readingPanel').style.display = 'none'; mainInput.focus(); }
+  function commit(segs) {
+    state.items.push({ segments: segs.map(g => g.t === 'q' ? { t: 'q', s: g.s, r: g.r || '' } : { t: 'text', s: g.s }) });
+    pending = null;
+    $('readingPanel').style.display = 'none';
+    mainInput.value = '';
+    renderAll(); save();
+    mainInput.focus();
+  }
+  mainInput.addEventListener('keydown', e => {
+    if (e.isComposing || e.keyCode === 229) return;
+    if (e.key === 'Enter') { e.preventDefault(); submitMain(); }
+  });
+  $('addBtn').onclick = submitMain;
+
+  // ---------- 問題一覧（編集用） ----------
+  function renderList() {
+    const list = $('itemList');
+    if (!state.items.length) { list.innerHTML = '<span class="empty">問題はまだありません。</span>'; return; }
+    list.innerHTML = '';
+    state.items.forEach((item, n) => {
+      const el = document.createElement('span');
+      el.className = 'it';
+      el.innerHTML = `<span class="n">(${n + 1})</span>` +
+        item.segments.map(g => g.t === 'q' ? `<span class="k">${esc(g.s)}</span>` : esc(g.s)).join('') +
+        ` <button data-a="up">↑</button><button data-a="down">↓</button><button data-a="edit">編集</button><button data-a="del">削除</button>`;
+      el.addEventListener('click', e => {
+        const a = e.target.dataset.a; if (!a) return;
+        const it = state.items;
+        if (a === 'del') it.splice(n, 1);
+        if (a === 'up' && n > 0) [it[n - 1], it[n]] = [it[n], it[n - 1]];
+        if (a === 'down' && n < it.length - 1) [it[n + 1], it[n]] = [it[n], it[n + 1]];
+        if (a === 'edit') { mainInput.value = toNotation(item.segments); it.splice(n, 1); mainInput.focus(); }
+        renderAll(); save();
+      });
+      list.appendChild(el);
+    });
+  }
+
+  // ---------- 組版（画面プレビューと印刷で同じページ割り） ----------
+  // 各問題を「分割できない単位」に分ける：文字1つ／解答枠1つ（番号は最初の単位にくっつける）
+  function unitsOf(item, n) {
+    const units = [];
+    item.segments.forEach(g => {
+      if (g.t === 'q') {
+        const w = Array.from(g.s).length + 2;
+        const rt = Array.from(g.r || '').map(c => `<span>${esc(c)}</span>`).join('');
+        units.push(`<span class="box"><span class="rt">${rt}</span><span class="fr" style="width:${w}em"><span class="tr">${esc(g.s)}</span></span></span>`);
+      } else {
+        Array.from(g.s).forEach(c => {
+          if (units.length && NO_HEAD.test(c)) units[units.length - 1] += esc(c);
+          else units.push(esc(c));
+        });
+      }
+    });
+    if (!units.length) units.push('');
+    units[0] = `<span class="q-num">(${n + 1})</span>` + units[0];
+    return units;
+  }
+
+  function mmToPx(mm) {
+    const d = document.createElement('div'); d.style.cssText = `position:absolute;visibility:hidden;width:${mm}mm`;
+    document.body.appendChild(d); const w = d.getBoundingClientRect().width; d.remove(); return w;
+  }
+  const headHTML = () => `<div class="sheet-head"><div class="sheet-title">${esc(state.title)}</div><div class="sheet-name">名前 <span>&nbsp;</span></div></div>`;
+
+  function layout() {
+    document.documentElement.style.setProperty('--fs', state.fontSize + 'pt');
+    const FULL = mmToPx(190) - 1;
+    const PAGE_H = mmToPx(275); // 印刷時の高さ(276mm)より少し小さく → はみ出し防止
+
+    // 1) 単位ごとの幅を測る
+    const qs = state.items.map((it, n) => unitsOf(it, n));
+    const meas = $('measure');
+    meas.innerHTML = qs.map(us => us.map(u => `<span class="u">${u}</span>`).join('')).join('<br>');
+    const spans = meas.querySelectorAll('.u');
+    const gap = parseFloat(getComputedStyle(meas).fontSize) * 0.6;
+    let k = 0;
+    const qw = qs.map(us => us.map(() => spans[k++].getBoundingClientRect().width));
+    meas.innerHTML = '';
+
+    // 2) 行に詰める：1行に収まる問題は分割しない／収まらない長い問題だけ折り返して空きを埋める
+    const lines = [[]];
+    let x = 0;
+    const put = (html, w, qStart) => {
+      const g = (qStart && x > 0) ? gap : 0;
+      if (x > 0 && x + g + w > FULL) { lines.push([]); x = 0; return put(html, w, qStart); }
+      lines[lines.length - 1].push(`<span class="u${qStart ? ' qs' : ''}">${html}</span>`);
+      x += g + w;
+    };
+    qs.forEach((us, qi) => {
+      const ws = qw[qi];
+      const total = ws.reduce((a, b) => a + b, 0);
+      if (x > 0 && x + gap + total > FULL && total <= FULL) { lines.push([]); x = 0; } // 丸ごと次の行へ
+      us.forEach((u, i) => put(u, ws[i], i === 0));
+    });
+
+    // 3) 行の高さを測ってページに割り付ける（行の途中で改ページしない）
+    const ml = $('measureLines');
+    ml.innerHTML = headHTML() + lines.map(l => `<div class="line txt">${l.join('')}</div>`).join('');
+    const headH = ml.firstElementChild.getBoundingClientRect().height + mmToPx(4);
+    const pages = [[]];
+    let y = headH;
+    ml.querySelectorAll('.line').forEach((el, i) => {
+      const h = el.getBoundingClientRect().height;
+      if (y + h > PAGE_H && pages[pages.length - 1].length) { pages.push([]); y = 0; }
+      pages[pages.length - 1].push(i);
+      y += h;
+    });
+    ml.innerHTML = '';
+
+    // 4) ページとして描画（印刷も同じDOMをそのまま使う）
+    $('pages').innerHTML = pages.map((p, pi) =>
+      `<div class="pv-label">${pi + 1} / ${pages.length} ページ</div><div class="page"><div class="page-inner">` +
+      (pi === 0 ? headHTML() : '') +
+      p.map(i => `<div class="line txt">${lines[i].join('')}</div>`).join('') +
+      `</div></div>`).join('');
+    $('status').textContent = `${state.items.length} 問 ／ A4縦 ${pages.length} ページ（${state.fontSize}pt）`;
+  }
+
+  function renderAll() {
+    $('titleInput').value = state.title;
+    renderList();
+    layout();
+  }
+
+  // ---------- 設定 ----------
+  let timer;
+  const later = () => { clearTimeout(timer); timer = setTimeout(() => { layout(); save(); }, 150); };
+  $('fsInput').addEventListener('input', e => {
+    const v = parseFloat(e.target.value);
+    if (v >= 8 && v <= 200) { state.fontSize = v; later(); }
+  });
+  $('titleInput').addEventListener('input', e => { state.title = e.target.value; later(); });
+
+  function setMode(trace) {
+    state.trace = trace;
+    document.body.classList.toggle('trace', trace);
+    $('modeNormal').classList.toggle('on', !trace);
+    $('modeTrace').classList.toggle('on', trace);
+    save();
+  }
+  $('modeNormal').onclick = () => setMode(false);
+  $('modeTrace').onclick = () => setMode(true);
+  $('printBtn').onclick = () => window.print();
+
+  // ---------- 保存 / 読込み ----------
+  $('saveBtn').onclick = () => {
+    const data = { app: 'kanji-print', version: 1, title: state.title, fontSize: state.fontSize, items: state.items };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    const d = new Date(), p2 = v => String(v).padStart(2, '0');
+    a.href = URL.createObjectURL(blob);
+    a.download = `kanji_print_${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}_${p2(d.getHours())}${p2(d.getMinutes())}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  };
+  $('loadBtn').onclick = () => $('fileInput').click();
+  $('fileInput').addEventListener('change', async e => {
+    const f = e.target.files[0]; if (!f) return;
+    try {
+      const data = JSON.parse(await f.text());
+      if (!Array.isArray(data.items)) throw new Error('items がありません');
+      state.items = data.items.map(it => ({ segments: (it.segments || []).map(g => g.t === 'q' ? { t: 'q', s: String(g.s), r: String(g.r || '') } : { t: 'text', s: String(g.s) }) }));
+      if (data.title != null) state.title = String(data.title);
+      if (data.fontSize) state.fontSize = Number(data.fontSize);
+      $('fsInput').value = state.fontSize;
+      renderAll(); save();
+    } catch (err) { showMsg('読み込みに失敗しました：' + err.message); }
+    e.target.value = '';
+  });
+  $('clearBtn').onclick = () => {
+    if (!state.items.length) return;
+    const btn = $('clearBtn');
+    if (btn.dataset.confirm) { state.items = []; renderAll(); save(); btn.textContent = '全削除'; delete btn.dataset.confirm; return; }
+    btn.dataset.confirm = '1'; btn.textContent = 'もう一度押すと全削除';
+    setTimeout(() => { btn.textContent = '全削除'; delete btn.dataset.confirm; }, 3000);
+  };
+  function showMsg(m) {
+    const d = document.createElement('div');
+    d.textContent = m;
+    d.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#c53030;color:#fff;padding:10px 16px;border-radius:6px;z-index:9;';
+    document.body.appendChild(d); setTimeout(() => d.remove(), 4000);
+  }
+
+  // 作業中の内容をブラウザに一時保存
+  function save() { try { localStorage.setItem('kanjiPrintState', JSON.stringify(state)); } catch (e) {} }
+  try {
+    const s = JSON.parse(localStorage.getItem('kanjiPrintState') || 'null');
+    if (s && Array.isArray(s.items)) Object.assign(state, s);
+  } catch (e) {}
+
+  $('fsInput').value = state.fontSize;
+  setMode(!!state.trace);
+  renderAll();
+  if (document.fonts) document.fonts.ready.then(layout);
+  mainInput.focus();
+})();
+</script>
+</body>
+</html>
