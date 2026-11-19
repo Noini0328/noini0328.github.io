@@ -101,7 +101,7 @@
     <div class="hint">
       Enterを押すと、ひらがな・カタカナ以外の漢字部分が問題になります。続けて読み（ふりがな）を入力 → Enter で問題が追加され、入力欄に戻ります。<br>
       読みを最初から指定する場合：<code>誇[ほこ]りと使命感[しめいかん]</code> または <code>使命感（しめいかん）</code> の形式で入力できます。<br>
-      問題にしたくない漢字は前に <code>/</code> を付けます：<code>/学校で漢字[かんじ]を/書く</code> →「学校」「書」はそのまま表示、「漢字」だけが問題。<code>/</code> 自体を表示したいときは <code>//</code>。
+      問題にしたくない漢字は前に <code>/</code> または <code>\</code> を付けます：<code>/学校で漢字[かんじ]を/書く</code> →「学校」「書」はそのまま表示、「漢字」だけが問題。記号自体を表示したいときは <code>//</code> や <code>\\</code> のように2つ重ねます。
     </div>
   </div>
 
@@ -163,11 +163,12 @@
     let i = 0, buf = '';
     const flush = () => { if (buf) { segs.push({ t: 'text', s: buf }); buf = ''; } };
     const closeMap = { '[': ']', '［': '］', '(': ')', '（': '）' };
-    const SL = c => c === '/' || c === '／';
+    // エスケープ記号：/ ／ \ ＼（日本語キーボードの ¥ ￥ も \ として扱う）
+    const SL = c => c != null && '/／\\＼¥￥'.includes(c);
     while (i < chars.length) {
-      // エスケープ：「/漢字」はその漢字のかたまりを問題にしない。「//」は「/」そのもの
+      // エスケープ：「/漢字」「\漢字」はその漢字のかたまりを問題にしない。「//」「\\」は記号そのもの
       if (SL(chars[i])) {
-        if (SL(chars[i + 1])) { buf += chars[i]; i += 2; continue; }
+        if (chars[i + 1] === chars[i]) { buf += chars[i]; i += 2; continue; }
         if (i + 1 < chars.length && KANJI.test(chars[i + 1])) {
           i++;
           while (i < chars.length && KANJI.test(chars[i])) buf += chars[i++];
@@ -194,7 +195,7 @@
   }
   const KANJI_RUN = /[\p{Script=Han}々〆〇ヶ]+/gu;
   const toNotation = segs => segs.map(g => g.t === 'q' ? `${g.s}[${g.r}]`
-    : g.s.replace(/[\/／]/g, m => m + m).replace(KANJI_RUN, m => '/' + m)).join('');
+    : g.s.replace(/[\/／\\＼¥￥](?=[\/／\\＼¥￥\p{Script=Han}々〆〇ヶ])/gu, m => m + m).replace(KANJI_RUN, m => '/' + m)).join('');
 
   // ---------- 入力 ----------
   function submitMain() {
