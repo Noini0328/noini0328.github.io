@@ -17,7 +17,7 @@
 
 ### kd-tree(KDツリー）
 
-[kdツリーによる近傍探索（範囲探索）の可視化](https://noini0328.github.io/Informatics/kdtree.html)
+[kdツリーによる近傍探索（範囲探索）の可視化](https://noini0328.github.io/Informatics/kd-tree/kdtree.html)
 
 
 ## education（子供の教育）
