@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="ja" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>BJJ Timer</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--hdr:#37474f;--deep:#eef0f5;--card:#fff;--txt:#1a1a2e;--txt2:rgba(20,20,50,.6);--bd:rgba(0,0,0,.14);--sf:#e8eaf6;--lbl:clamp(13px,2.5vw,20px);
+--wbg:#f5f5f7;--wac:#37474f;--wbtn:#fff;--wbt:#263238;--whd:#cfd8dc;--wht:#37474f;
+--gbg:repeating-linear-gradient(135deg,#fff9c4 0 22px,#c8e6c9 22px 44px);--gac:#14702e;--gbtn:#fff;--gbt:#1b8a3a;--gnum:#1b8a3a;--ghd:#1b8a3a;--ght:#fdd835}
+[data-theme=dark]{--hdr:#10151c;--deep:#0b0e13;--card:#1a1f27;--txt:#eee;--txt2:rgba(230,230,255,.6);--bd:rgba(255,255,255,.15);--sf:#1c2230;
+--wbg:#14171d;--wac:#cfd8dc;--wbtn:#2b323d;--wbt:#fff;--whd:#2b323d;--wht:#eceff1;
+--gbg:repeating-linear-gradient(135deg,#2e2c0a 0 22px,#0f2d19 22px 44px);--gac:#7fd48f;--gbtn:#fff;--gbt:#1b8a3a;--gnum:#66d17a;--ghd:#1b8a3a;--ght:#fdd835}
+html,body{height:100%;overflow:hidden}
+body{background:var(--deep);color:var(--txt);font-family:system-ui,-apple-system,sans-serif;display:flex;flex-direction:column;user-select:none;-webkit-tap-highlight-color:transparent;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+button{font-family:inherit}
+#hdr{background:var(--hdr);display:flex;align-items:center;gap:8px;padding:8px 12px;flex-shrink:0}
+#sbtn{background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.35);border-radius:9px;padding:8px 12px;color:#fff;font-size:15px;font-weight:700;cursor:pointer}
+.bdg{padding:6px 12px;border-radius:8px;font-size:15px;font-weight:900;border:2px solid;white-space:nowrap}
+#rb{margin-left:auto;font-size:17px;padding:6px 14px;min-width:100px;text-align:center}
+#trow{background:var(--hdr);display:flex;justify-content:center;padding:4px 0 10px;flex-shrink:0}
+#timer{font-size:clamp(52px,13vw,96px);font-weight:900;letter-spacing:4px;font-variant-numeric:tabular-nums;color:#fff;line-height:1.15}
+#timer.low{color:#ffcdd2;animation:p .7s infinite alternate}@keyframes p{to{opacity:.55}}
+#main{flex:1;display:flex;min-height:0}
+.pn{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg)}
+.pw{--num:var(--wac);--bg:var(--wbg);--ac:var(--wac);--btn:var(--wbtn);--bt:var(--wbt);--hd:var(--whd);--ht:var(--wht)}
+.pg{--num:var(--gnum);--bg:var(--gbg);--ac:var(--gac);--btn:var(--gbtn);--bt:var(--gbt);--hd:var(--ghd);--ht:var(--ght)}
+.dv{width:2px;background:var(--bd)}
+.ph{cursor:pointer;background:var(--hd);color:var(--ht);text-align:center;font-size:clamp(18px,3.4vw,26px);font-weight:900;letter-spacing:8px;padding:6px 0}
+.bd{flex:1;display:flex;flex-direction:column;gap:4px;padding:4px;min-height:0}
+.rw{display:flex;gap:4px;min-height:0}
+.cd{position:relative;flex:1;border:2px solid var(--ac);border-radius:10px;background:var(--card);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;overflow:hidden;min-width:0;cursor:pointer}
+.cd:active{filter:brightness(.88)}
+.cd.off{opacity:.35;pointer-events:none}
+.lb{font-size:var(--lbl);font-weight:800;color:var(--txt2);white-space:nowrap}
+.lb.s{font-size:clamp(10px,2vw,15px)}
+.vl{font-size:clamp(34px,8vw,66px);font-weight:900;line-height:1;color:var(--num);font-variant-numeric:tabular-nums}
+.sb{font-size:clamp(8px,1.3vw,11px);font-weight:800;color:#e65100;min-height:1em}
+.pc{flex:3;cursor:default}
+.pb{display:flex;gap:5px;width:100%;padding:0 5px 5px;flex:1;min-height:0}
+.pb button{flex:1;border:2px solid var(--ac);border-radius:10px;background:var(--btn);color:var(--bt);font-size:clamp(22px,5vw,38px);font-weight:900;cursor:pointer}
+.pb button:active{filter:brightness(.85)}
+.r2{flex:2}.r1{flex:1.2}
+.ip{flex:1;border:2px solid var(--ac);border-radius:10px;background:var(--btn);color:var(--bt);font-size:clamp(22px,5vw,34px);font-weight:900;letter-spacing:6px;cursor:pointer;position:relative;display:flex;align-items:center;justify-content:center}
+.ip:active{filter:brightness(.85)}.ip.off{opacity:.45}
+.ud{position:absolute;bottom:3px;left:4px;font-size:clamp(10px,1.6vw,13px);font-weight:700;letter-spacing:0;padding:3px 7px;border-radius:5px;border:1.5px solid var(--ac);background:var(--card);color:var(--ac);cursor:pointer;pointer-events:auto;z-index:2}
+.pkc{display:block;width:100%;margin-bottom:8px;padding:14px;border:2px solid rgba(0,0,0,.25);border-radius:10px;font-size:18px;font-weight:900;cursor:pointer}
+#ft{background:var(--hdr);display:flex;gap:6px;padding:8px 10px;min-height:84px;flex-shrink:0}
+#ft button{flex:1;border-radius:12px;border:2px solid rgba(255,255,255,.4);background:rgba(255,255,255,.12);color:#fff;font-size:clamp(14px,2.8vw,20px);font-weight:800;cursor:pointer}
+#ft button:disabled{opacity:.3;pointer-events:none}
+#bm{flex:2!important;font-size:clamp(20px,4.5vw,30px)!important;font-weight:900!important;border-width:3px!important}
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:9;padding:12px}
+.ov.h{display:none}
+.md{background:var(--sf);color:var(--txt);border-radius:16px;padding:20px;width:100%;max-width:400px;max-height:90dvh;overflow:auto}
+.md h2{font-size:17px;margin-bottom:14px}
+.sr{display:flex;align-items:center;padding:9px 4px;border-bottom:1px solid var(--bd);font-size:14px}
+.sr label{flex:1}
+.cc{width:34px;height:34px;border-radius:50%;border:2px solid var(--hdr);background:none;color:var(--txt);font-size:18px;font-weight:700;cursor:pointer}
+.vd{width:84px;text-align:center;font-weight:700}
+.sw{width:44px;height:25px;border-radius:13px;border:none;position:relative;cursor:pointer;background:rgba(0,0,0,.25)}
+.sw::after{content:'';position:absolute;top:4px;left:3px;width:17px;height:17px;border-radius:50%;background:#fff;transition:left .2s}
+.sw.on{background:#1b8a3a}.sw.on::after{left:23px}
+.ma{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+.ma button{padding:9px 18px;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;background:rgba(128,128,128,.25);color:var(--txt)}
+.ma .ok{background:#1b8a3a;color:#fff}
+</style>
+</head>
+<body>
+<div id="hdr"><button id="sbtn" onclick="openS()">⚙ 設定</button><span class="bdg" id="sb2">待機中</span><span class="bdg" id="rb">－</span></div>
+<div id="trow"><div id="timer">05:00</div></div>
+<div id="main"><div class="pn pw" id="pw"></div><div class="dv"></div><div class="pn pg" id="pg"></div></div>
+<div id="ft">
+<button id="bu" onclick="undo()" disabled>✕ 無効</button>
+<button id="bm" onclick="mainBtn()">▶ 開始</button>
+<button onclick="show('rs')">↺ リセット</button>
+</div>
+
+<div class="ov h" id="rs"><div class="md"><h2>⚠ リセット確認</h2><p style="font-size:14px;line-height:1.7">試合データをすべてリセットしますか？</p><div class="ma"><button onclick="hide('rs')">キャンセル</button><button class="ok" style="background:#c62828" onclick="reset()">リセット</button></div></div></div>
+
+<div class="ov h" id="pk"><div class="md"><h2>色を選択</h2><div id="pkb"></div><div class="ma"><button onclick="hide('pk')">閉じる</button></div></div></div>
+
+<div class="ov h" id="st"><div class="md"><h2>⚙ 設定</h2>
+<div class="sr"><label>ダークモード</label><button class="sw" id="s-dark" onclick="tg('dark')"></button></div>
+<div class="sr"><label>試合時間</label><button class="cc" onclick="adj(-30)">－</button><div class="vd" id="s-dur"></div><button class="cc" onclick="adj(30)">＋</button></div>
+<div class="sr"><label>ペナルティ自動加算<br><small style="color:var(--txt2)">2つ目:相手アド+1 / 3つ目:相手+2点</small></label><button class="sw" id="s-auto" onclick="tg('auto')"></button></div>
+<div class="ma"><button onclick="hide('st')">キャンセル</button><button class="ok" onclick="saveS()">保存</button></div></div></div>
+
+<script>
+const TH={
+ w:{n:'白',hd:'#cfd8dc',ht:'#37474f',a:'#37474f',da:'#cfd8dc',bl:'#f5f5f7',bd:'#14171d',bt:'#263238'},
+ k:{n:'黒',hd:'#212121',ht:'#fff',a:'#212121',da:'#e0e0e0',bl:'#d8d8dc',bd:'#101010',bt:'#212121'},
+ b:{n:'青',hd:'#1565c0',ht:'#fff',a:'#1565c0',da:'#90caf9',bl:'#e1eefc',bd:'#0b1a2e',bt:'#1565c0'},
+ o:{n:'その他',hd:'#c0202e',ht:'#fff',a:'#c0202e',da:'#ff8a80',bl:'#fff0f0',bd:'#260b0d',bt:'#c0202e'},
+ y:{n:'黄/緑',hd:'repeating-linear-gradient(135deg,#fdd835 0 14px,#66bb6a 14px 28px)',ht:'#0b3d16',a:'#14702e',da:'#7fd48f',bl:'repeating-linear-gradient(135deg,#fff9c4 0 22px,#c8e6c9 22px 44px)',bd:'repeating-linear-gradient(135deg,#2e2c0a 0 22px,#0f2d19 22px 44px)',bt:'#1b8a3a',bb:'#fff',bk:'#1b8a3a',nl:'#1b8a3a',nd:'#66d17a'}
+},E=()=>({ippon:0,pts:[],adv:0,pen:0}),opp=k=>k=='w'?'g':'w';
+const S={cfg:{dur:300,auto:true,dark:false},col:{w:'w',g:'y'},w:E(),g:E(),st:'idle',rem:300};
+const N=new Proxy({},{get:(_,k)=>TH[S.col[k]].n});
+let H=[],T=null,tmp={};
+const tot=k=>S[k].pts.reduce((a,b)=>a+b,0)+(S.cfg.auto&&S[opp(k)].pen>=3?2:0);
+const adv=k=>S[k].adv+(S.cfg.auto&&S[opp(k)].pen>=2?1:0);
+function winner(){for(const k of['w','g']){if(S[k].ippon)return k;if(S[k].pen>=4)return opp(k)}return null}
+function lead(){for(const f of[tot,adv,k=>-S[k].pen]){const a=f('w'),b=f('g');if(a!=b)return a>b?'w':'g'}return'draw'}
+const fmt=s=>String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
+const mstr=s=>Math.floor(s/60)+'分'+(s%60?s%60+'秒':'');
+function push(){H.push(JSON.stringify({w:S.w,g:S.g,st:S.st,rem:S.rem}));if(H.length>40)H.shift()}
+function act(k,t,v){push();const p=S[k];
+ if(t=='pt')p.pts.push(v);if(t=='adv')p.adv++;if(t=='pen')p.pen=Math.min(4,p.pen+1);if(t=='ippon')p.ippon=1;
+ if(winner()&&(S.st=='running'||S.st=='paused'))finish();else render()}
+const ud=(k,t,on)=>on?`<button class="ud" onclick="sub('${k}','${t}',event)">無効</button>`:'';
+function sub(k,t,e){e.stopPropagation();push();const p=S[k];
+ if(t=='pt')p.pts.pop();if(t=='adv')p.adv=Math.max(0,p.adv-1);if(t=='pen')p.pen=Math.max(0,p.pen-1);if(t=='ippon')p.ippon=0;
+ if(S.st=='finished'&&!winner()&&S.rem>0)S.st='paused';render()}
+function tv(k){const t=TH[S.col[k]],d=S.cfg.dark;
+ return`--hd:${t.hd};--ht:${t.ht};--ac:${d?t.da:t.a};--bg:${d?t.bd:t.bl};--btn:${d?(t.bb||'#2b323d'):'#fff'};--bt:${d?(t.bk||'#fff'):t.bt};--num:${d?(t.nd||t.da):(t.nl||t.a)}`}
+let pk='w';
+function pick(k){pk=k;document.getElementById('pkb').innerHTML=Object.keys(TH).map(c=>{const t=TH[c];return`<button class="pkc" style="background:${t.hd};color:${t.ht}" onclick="setC('${c}')">${t.n}${S.col[k]==c?' ✓':''}</button>`}).join('');show('pk')}
+function setC(c){S.col[pk]=c;hide('pk');render()}
+function undo(){if(!H.length)return;const s=JSON.parse(H.pop());S.w=s.w;S.g=s.g;
+ if(S.st=='finished'&&s.st!='finished'){S.rem=s.rem;S.st=s.st;if(S.st=='running')tick()}
+ render()}
+function tick(){clearInterval(T);T=setInterval(()=>{S.rem--;if(S.rem<=0){S.rem=0;finish()}else render()},1000)}
+function finish(){clearInterval(T);S.st='finished';beepEnd();render()}
+function mainBtn(){
+ if(S.st=='idle'){S.rem=S.cfg.dur;beepStart();S.st='running';tick()}
+ else if(S.st=='running'){clearInterval(T);S.st='paused'}
+ else if(S.st=='paused'){S.st='running';tick()}
+ render()}
+function reset(){clearInterval(T);S.w=E();S.g=E();S.st='idle';S.rem=S.cfg.dur;H=[];hide('rs');render()}
+const show=i=>document.getElementById(i).classList.remove('h'),hide=i=>document.getElementById(i).classList.add('h');
+
+let ac;const AC=()=>ac||(ac=new(window.AudioContext||window.webkitAudioContext)());
+function beep(d,t){const a=AC(),g=a.createGain(),o=a.createOscillator();g.gain.setValueAtTime(1,t);g.gain.setValueAtTime(1,t+d-.03);g.gain.linearRampToValueAtTime(.001,t+d+.01);o.type='square';o.frequency.value=880;o.connect(g);g.connect(a.destination);o.start(t);o.stop(t+d+.03)}
+function beepStart(){const a=AC();a.resume();beep(2.5,a.currentTime)}
+function beepEnd(){const a=AC();a.resume();const t=a.currentTime;for(let s=0;s<3;s++)for(let i=0;i<4;i++)beep(.09,t+s*.7+i*.1)}
+
+function openS(){tmp={...S.cfg};us();show('st')}
+function tg(k){tmp[k]=!tmp[k];us()}
+function adj(d){tmp.dur=Math.max(60,Math.min(900,tmp.dur+d));us()}
+function us(){document.getElementById('s-dark').className='sw'+(tmp.dark?' on':'');document.getElementById('s-auto').className='sw'+(tmp.auto?' on':'');document.getElementById('s-dur').textContent=mstr(tmp.dur)}
+function saveS(){S.cfg={...tmp};document.documentElement.dataset.theme=S.cfg.dark?'dark':'light';if(S.st=='idle')S.rem=S.cfg.dur;hide('st');render()}
+
+function panel(k){
+ const p=S[k],a=adv(k),t=tot(k),ba=a-p.adv,bt=t-p.pts.reduce((x,y)=>x+y,0);
+ return`<div class="ph" onclick="pick('${k}')">${N[k]} ▾</div><div class="bd">
+ <div class="cd pc" style="flex:3"><div class="lb">ポイント</div><div class="vl">${t}</div><div class="sb">${bt?'ペナルティ +'+bt:''}</div>
+ ${ud(k,'pt',p.pts.length)}<div class="pb">${[2,3,4].map(v=>`<button onclick="act('${k}','pt',${v})">+${v}</button>`).join('')}</div>
+ </div>
+ <div class="rw r2">
+ <div class="cd" onclick="act('${k}','adv')">${ud(k,'adv',p.adv)}<div class="lb s">アドバンテージ</div><div class="vl">${a}</div><div class="sb">${ba?'ペナルティ +'+ba:''}</div></div>
+ <div class="cd ${p.pen>=4?'off':''}" onclick="act('${k}','pen')">${ud(k,'pen',p.pen)}<div class="lb">ペナルティ</div><div class="vl" style="color:${p.pen>=4?'#c62828':'var(--num)'}">${p.pen}</div><div class="sb">${p.pen>=4?'失格':'/4'}</div></div></div>
+ <div class="rw r1"><div class="ip ${p.ippon?'off':''}" style="flex:1" onclick="act('${k}','ippon')">${p.ippon?'一本 ✓':'一本'}${ud(k,'ippon',p.ippon)}</div></div></div>`}
+
+function render(){
+ const tm=document.getElementById('timer');tm.textContent=fmt(S.rem);tm.className=S.rem<=30&&S.st=='running'?'low':'';
+ const sm={idle:['待機中','#546e7a'],running:['試合中','#2e7d32'],paused:['待て','#ef6c00'],finished:['終　了','#c62828']}[S.st],sb=document.getElementById('sb2');
+ sb.textContent=sm[0];sb.style.cssText=`background:${sm[1]};border-color:${sm[1]};color:#fff`;
+ const rb=document.getElementById('rb'),w=winner(),l=lead();let tx='－',bg='rgba(255,255,255,.15)',fg='#fff',who=null;
+ if(w){who=w;tx=N[w]+' 勝ち'}
+ else if(S.st=='finished'){if(l=='draw')tx='引き分け';else{who=l;tx=N[l]+' 勝ち'}}
+ else if(S.st!='idle'){if(l=='draw')tx='同点';else{who=l;tx=N[l]+' リード'}}
+ if(who){const t=TH[S.col[who]];bg=t.hd;fg=t.ht}
+ rb.textContent=tx;rb.style.cssText=`background:${bg};color:${fg};border-color:#fff`;
+ for(const k of['w','g']){const e=document.getElementById('p'+k);e.style.cssText=tv(k);e.innerHTML=panel(k)}
+ const bm=document.getElementById('bm');bm.textContent={idle:'▶ 開始',running:'⏸ 待て',paused:'▶ 再開',finished:'終　了'}[S.st];bm.disabled=S.st=='finished';
+ const u=document.getElementById('bu');u.disabled=!H.length;u.style.visibility=H.length?'visible':'hidden'}
+S.rem=S.cfg.dur;render();
+</script>
+</body>
+</html>
