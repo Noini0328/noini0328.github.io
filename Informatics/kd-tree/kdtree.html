@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8"><title>kd-tree 最近傍探索の可視化</title>
+<style>
+body{font-family:"Noto Sans JP","Hiragino Sans","Yu Gothic",Meiryo,sans-serif;max-width:1440px;margin:0 auto;padding:24px;color:#222;line-height:1.7}
+h1{font-size:1.6em;border-bottom:2px solid #4a6fa5;padding-bottom:6px}
+h2{font-size:1.25em;margin-top:2em;color:#4a6fa5}
+code{background:#f2f4f7;padding:1px 5px;border-radius:3px}
+pre{background:#1e1e1e;color:#ddd;padding:14px;border-radius:6px;overflow:auto;font-size:13px;line-height:1.45;max-height:70vh}
+details{border:1px solid #ccd;border-radius:6px;padding:8px 12px;margin:10px 0}
+summary{cursor:pointer;font-weight:bold}
+img{max-width:100%;border:1px solid #ddd}
+iframe{width:100%;height:880px;border:1px solid #ddd}
+ul{margin-top:0}
+.note{color:#666;font-size:.9em}
+</style></head><body>
+<h1>kd-tree による最近傍探索の可視化</h1>
+<p>点群から kd-tree を構築し、クエリ点に最も近い点を探す過程をステップごとに可視化します。
+近い側の部分木から降りて最良候補を更新し、戻る際に「分割線（面）までの距離 &lt; 現在の最短距離」のときだけ反対側を探索、それ以外は枝刈りします。</p>
+<ul>
+<li><b>オレンジ</b>：現在のノードと担当領域</li>
+<li><b>緑</b>：最良候補と探索円 / 探索球（半径 = 現在の最短距離）</li>
+<li><b>グレー</b>：枝刈りされた領域・部分木</li>
+<li><b>青</b>：訪問済みノード</li>
+</ul>
+
+<h2>1. 2D 版（GIF アニメーション）</h2>
+<img src="kdtree_nn_demo.gif" alt="kd-tree 2D 最近傍探索のアニメーション">
+<p class="note">実行例: <code>python kdtree_nn_visualizer.py --seed 1 --save kdtree_nn_demo.gif</code>（20 点）</p>
+
+<h2>2. 3D 版（マウスで回転・ズーム可能）</h2>
+<p>ドラッグで回転、スクロールでズーム。下部のスライダー / 再生ボタンでステップを進めます。</p>
+<iframe src="kdtree_nn_3d_demo.html" title="kd-tree 3D 最近傍探索"></iframe>
+<p class="note">実行例: <code>python kdtree_nn_visualizer_3d.py --seed 2</code>（25 点）。<a href="kdtree_nn_3d_demo.html" target="_blank">別タブで開く</a></p>
+
+<h2>3. 使い方</h2>
+<pre>pip install numpy matplotlib pillow plotly
+
+# 2D: ウィンドウ表示 / GIF 保存
+python kdtree_nn_visualizer.py
+python kdtree_nn_visualizer.py -n 30 --seed 3 --query 0.3 0.7 --save out.gif
+
+# 3D: HTML を生成してブラウザで開く
+python kdtree_nn_visualizer_3d.py -n 40 --seed 3 --query 0.3 0.7 0.5</pre>
+
+<h2>4. ソースコード</h2>
+<details><summary>kdtree_nn_visualizer.py（2D 版 / matplotlib）</summary><pre>&quot;&quot;&quot;
+kd-tree による最近傍探索の可視化
+================================
+
+2次元点群から kd-tree を構築し、クエリ点に対する最近傍探索の過程を
+ステップごとにアニメーション表示します。
+
+表示内容:
+  - 左: 空間分割 (分割線) と探索の様子
+      * 訪問中のノード (オレンジ)
+      * 現在の最良候補 (緑) と、その距離を半径とする探索円
+      * 枝刈りされた領域 (グレーの網掛け)
+  - 右: kd-tree の木構造 (訪問済み / 枝刈り / 現在ノードを色分け)
+  - 下: 各ステップの説明テキスト
+
+使い方:
+  python kdtree_nn_visualizer.py                  # ウィンドウでアニメーション表示
+  python kdtree_nn_visualizer.py --save out.gif   # GIF として保存
+  python kdtree_nn_visualizer.py -n 30 --seed 3 --query 0.3 0.7
+
+必要ライブラリ: numpy, matplotlib (GIF 保存時は pillow)
+&quot;&quot;&quot;
+
+import argparse
+from dataclasses import dataclass, field
+
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib.animation import FuncAnimation, PillowWriter
+from matplotlib.patches import Circle, Rectangle
+
+# 日本語フォントがあれば使う (無ければ英語表示でも動作します)
+from matplotlib import font_manager as _fm
+
+_available = {f.name for f in _fm.fontManager.ttflist}
+for _f in [&quot;Noto Sans CJK JP&quot;, &quot;IPAexGothic&quot;, &quot;IPAGothic&quot;, &quot;Hiragino Sans&quot;, &quot;Yu Gothic&quot;,
+           &quot;Meiryo&quot;, &quot;MS Gothic&quot;, &quot;Noto Sans CJK SC&quot;, &quot;Noto Sans CJK TC&quot;]:
+    if _f in _available:
+        plt.rcParams[&quot;font.family&quot;] = _f
+        break
+
+
+# ----------------------------------------------------------------------
+# kd-tree
+# ----------------------------------------------------------------------
+@dataclass
+class Node:
+    point: np.ndarray
+    axis: int
+    bounds: tuple            # (xmin, xmax, ymin, ymax) このノードが担当する領域
+    left: &quot;Node&quot; = None
+    right: &quot;Node&quot; = None
+    id: int = 0
+    depth: int = 0
+    # 木の描画用座標
+    tx: float = 0.0
+    ty: float = 0.0
+
+
+def build_kdtree(points, depth=0, bounds=(0, 1, 0, 1), counter=None):
+    &quot;&quot;&quot;中央値で分割する標準的な kd-tree 構築&quot;&quot;&quot;
+    if counter is None:
+        counter = [0]
+    if len(points) == 0:
+        return None
+    axis = depth % 2
+    pts = points[points[:, axis].argsort()]
+    mid = len(pts) // 2
+    node = Node(point=pts[mid], axis=axis, bounds=bounds, id=counter[0], depth=depth)
+    counter[0] += 1
+
+    xmin, xmax, ymin, ymax = bounds
+    s = pts[mid][axis]
+    if axis == 0:
+        lb, rb = (xmin, s, ymin, ymax), (s, xmax, ymin, ymax)
+    else:
+        lb, rb = (xmin, xmax, ymin, s), (xmin, xmax, s, ymax)
+    node.left = build_kdtree(pts[:mid], depth + 1, lb, counter)
+    node.right = build_kdtree(pts[mid + 1:], depth + 1, rb, counter)
+    return node
+
+
+def iter_nodes(node):
+    if node is None:
+        return
+    yield node
+    yield from iter_nodes(node.left)
+    yield from iter_nodes(node.right)
+
+
+def layout_tree(root):
+    &quot;&quot;&quot;木を描画するための座標 (in-order で x、深さで y) を割り当てる&quot;&quot;&quot;
+    order = [0]
+
+    def rec(n):
+        if n is None:
+            return
+        rec(n.left)
+        n.tx = order[0]
+        order[0] += 1
+        n.ty = -n.depth
+        rec(n.right)
+
+    rec(root)
+
+
+def rect_dist(q, bounds):
+    &quot;&quot;&quot;クエリ点から矩形領域までの最短距離 (枝刈り判定の補助表示用)&quot;&quot;&quot;
+    xmin, xmax, ymin, ymax = bounds
+    dx = max(xmin - q[0], 0, q[0] - xmax)
+    dy = max(ymin - q[1], 0, q[1] - ymax)
+    return np.hypot(dx, dy)
+
+
+# ----------------------------------------------------------------------
+# 最近傍探索 (各ステップを記録)
+# ----------------------------------------------------------------------
+@dataclass
+class Step:
+    current: Node
+    best: Node
+    best_dist: float
+    visited: set
+    pruned: list          # 枝刈りされたノード (部分木の根) のリスト
+    message: str
+
+
+def nn_search_with_trace(root, q):
+    steps = []
+    state = {&quot;best&quot;: None, &quot;dist&quot;: np.inf}
+    visited, pruned = set(), []
+
+    def snap(cur, msg):
+        steps.append(Step(cur, state[&quot;best&quot;], state[&quot;dist&quot;],
+                          set(visited), list(pruned), msg))
+
+    def search(node):
+        if node is None:
+            return
+        visited.add(node.id)
+        d = np.linalg.norm(node.point - q)
+        ax = &quot;x&quot; if node.axis == 0 else &quot;y&quot;
+        snap(node, f&quot;ノード {node.id} ({node.point[0]:.2f}, {node.point[1]:.2f}) を訪問&quot;
+                   f&quot;  距離 = {d:.3f}  [分割軸: {ax}]&quot;)
+        if d &lt; state[&quot;dist&quot;]:
+            state[&quot;best&quot;], state[&quot;dist&quot;] = node, d
+            snap(node, f&quot;最良候補を更新 → ノード {node.id}  (最短距離 {d:.3f})&quot;)
+
+        diff = q[node.axis] - node.point[node.axis]
+        near, far = (node.left, node.right) if diff &lt; 0 else (node.right, node.left)
+        side = &quot;左/下&quot; if diff &lt; 0 else &quot;右/上&quot;
+        if near is not None:
+            snap(node, f&quot;クエリは分割線の{side}側 → 近い側の部分木へ降りる&quot;)
+        search(near)
+
+        if far is None:
+            return
+        if abs(diff) &lt; state[&quot;dist&quot;]:
+            snap(node, f&quot;戻り: 分割線までの距離 {abs(diff):.3f} &lt; 最短距離 {state[&#x27;dist&#x27;]:.3f}&quot;
+                       f&quot; → 反対側も探索&quot;)
+            search(far)
+        else:
+            pruned.append(far)
+            snap(node, f&quot;戻り: 分割線までの距離 {abs(diff):.3f} ≥ 最短距離 {state[&#x27;dist&#x27;]:.3f}&quot;
+                       f&quot; → 反対側を枝刈り&quot;)
+
+    search(root)
+    snap(None, f&quot;探索終了: 最近傍はノード {state[&#x27;best&#x27;].id} &quot;
+               f&quot;({state[&#x27;best&#x27;].point[0]:.2f}, {state[&#x27;best&#x27;].point[1]:.2f})、&quot;
+               f&quot;距離 {state[&#x27;dist&#x27;]:.3f}  / 訪問 {len(visited)} ノード&quot;)
+    return steps
+
+
+# ----------------------------------------------------------------------
+# 可視化
+# ----------------------------------------------------------------------
+C_POINT = &quot;#4a6fa5&quot;
+C_SPLIT = &quot;#9aa5b1&quot;
+C_CUR = &quot;#f28e2b&quot;
+C_BEST = &quot;#2ca02c&quot;
+C_QUERY = &quot;#d62728&quot;
+C_PRUNE = &quot;#bbbbbb&quot;
+
+
+def draw_static(ax_space, ax_tree, root, q, all_nodes):
+    # --- 空間: 分割線 ---
+    for n in all_nodes:
+        xmin, xmax, ymin, ymax = n.bounds
+        if n.axis == 0:
+            ax_space.plot([n.point[0]] * 2, [ymin, ymax], color=C_SPLIT, lw=1, zorder=1)
+        else:
+            ax_space.plot([xmin, xmax], [n.point[1]] * 2, color=C_SPLIT, lw=1, zorder=1)
+    pts = np.array([n.point for n in all_nodes])
+    ax_space.scatter(pts[:, 0], pts[:, 1], s=28, color=C_POINT, zorder=3)
+    for n in all_nodes:
+        ax_space.annotate(str(n.id), n.point, xytext=(3, 3), textcoords=&quot;offset points&quot;,
+                          fontsize=7, color=&quot;#333&quot;)
+    ax_space.scatter(*q, marker=&quot;*&quot;, s=220, color=C_QUERY, zorder=6, label=&quot;クエリ&quot;)
+    ax_space.set_xlim(0, 1)
+    ax_space.set_ylim(0, 1)
+    ax_space.set_aspect(&quot;equal&quot;)
+    ax_space.set_title(&quot;空間分割と探索&quot;)
+    ax_space.set_xticks([])
+    ax_space.set_yticks([])
+
+    # --- 木構造: エッジ ---
+    for n in all_nodes:
+        for c in (n.left, n.right):
+            if c is not None:
+                ax_tree.plot([n.tx, c.tx], [n.ty, c.ty], color=C_SPLIT, lw=1, zorder=1)
+    ax_tree.set_title(&quot;kd-tree&quot;)
+    ax_tree.axis(&quot;off&quot;)
+
+
+def make_animation(root, q, steps, interval=900):
+    all_nodes = list(iter_nodes(root))
+    layout_tree(root)
+
+    fig = plt.figure(figsize=(13, 7))
+    gs = fig.add_gridspec(2, 2, height_ratios=[12, 1], width_ratios=[1, 1.25])
+    ax_space = fig.add_subplot(gs[0, 0])
+    ax_tree = fig.add_subplot(gs[0, 1])
+    ax_text = fig.add_subplot(gs[1, :])
+    ax_text.axis(&quot;off&quot;)
+
+    draw_static(ax_space, ax_tree, root, q, all_nodes)
+
+    # 木のノード (色を毎フレーム更新)
+    tree_scatter = ax_tree.scatter([n.tx for n in all_nodes], [n.ty for n in all_nodes],
+                                   s=260, color=&quot;white&quot;, edgecolor=&quot;#555&quot;, zorder=3)
+    for n in all_nodes:
+        ax_tree.text(n.tx, n.ty, str(n.id), ha=&quot;center&quot;, va=&quot;center&quot;, fontsize=7, zorder=4)
+    id_to_idx = {n.id: i for i, n in enumerate(all_nodes)}
+
+    def subtree_ids(n):
+        return {m.id for m in iter_nodes(n)}
+
+    dynamic = []
+    text = ax_text.text(0.5, 0.5, &quot;&quot;, ha=&quot;center&quot;, va=&quot;center&quot;, fontsize=12)
+
+    def update(i):
+        for art in dynamic:
+            art.remove()
+        dynamic.clear()
+        st = steps[i]
+
+        # 枝刈りされた領域
+        pruned_ids = set()
+        for p in st.pruned:
+            xmin, xmax, ymin, ymax = p.bounds
+            r = Rectangle((xmin, ymin), xmax - xmin, ymax - ymin, facecolor=C_PRUNE,
+                          alpha=0.35, hatch=&quot;//&quot;, edgecolor=&quot;#999&quot;, lw=0, zorder=0)
+            ax_space.add_patch(r)
+            dynamic.append(r)
+            pruned_ids |= subtree_ids(p)
+
+        # 現在ノードの担当領域と分割線
+        if st.current is not None:
+            xmin, xmax, ymin, ymax = st.current.bounds
+            r = Rectangle((xmin, ymin), xmax - xmin, ymax - ymin, fill=False,
+                          edgecolor=C_CUR, lw=2, ls=&quot;--&quot;, zorder=2)
+            ax_space.add_patch(r)
+            dynamic.append(r)
+            dynamic.extend(ax_space.plot(*st.current.point, &quot;o&quot;, ms=12, mfc=&quot;none&quot;,
+                                     mec=C_CUR, mew=2.5, zorder=5))
+            dynamic.extend(ax_space.plot([q[0], st.current.point[0]], [q[1], st.current.point[1]],
+                                     color=C_CUR, lw=1, ls=&quot;:&quot;, zorder=4))
+
+        # 最良候補と探索円
+        if st.best is not None:
+            c = Circle(q, st.best_dist, fill=False, edgecolor=C_BEST, lw=1.8, zorder=4)
+            ax_space.add_patch(c)
+            dynamic.append(c)
+            dynamic.extend(ax_space.plot(*st.best.point, &quot;o&quot;, ms=9, color=C_BEST, zorder=5))
+            dynamic.extend(ax_space.plot([q[0], st.best.point[0]], [q[1], st.best.point[1]],
+                                     color=C_BEST, lw=1.5, zorder=4))
+
+        # 木のノード色
+        colors = []
+        for n in all_nodes:
+            if st.current is not None and n.id == st.current.id:
+                colors.append(C_CUR)
+            elif st.best is not None and n.id == st.best.id:
+                colors.append(C_BEST)
+            elif n.id in pruned_ids:
+                colors.append(C_PRUNE)
+            elif n.id in st.visited:
+                colors.append(&quot;#a6c8ff&quot;)
+            else:
+                colors.append(&quot;white&quot;)
+        tree_scatter.set_facecolor(colors)
+
+        text.set_text(f&quot;[{i + 1}/{len(steps)}]  {st.message}&quot;)
+        return dynamic + [tree_scatter, text]
+
+    # 凡例
+    from matplotlib.lines import Line2D
+    from matplotlib.patches import Patch
+    handles = [
+        Line2D([], [], marker=&quot;*&quot;, color=C_QUERY, ls=&quot;&quot;, ms=12, label=&quot;クエリ&quot;),
+        Line2D([], [], marker=&quot;o&quot;, mec=C_CUR, mfc=&quot;none&quot;, ls=&quot;&quot;, ms=10, mew=2, label=&quot;現在ノード&quot;),
+        Line2D([], [], marker=&quot;o&quot;, color=C_BEST, ls=&quot;&quot;, ms=8, label=&quot;最良候補 / 探索円&quot;),
+        Patch(facecolor=&quot;#a6c8ff&quot;, edgecolor=&quot;#555&quot;, label=&quot;訪問済み&quot;),
+        Patch(facecolor=C_PRUNE, edgecolor=&quot;#999&quot;, hatch=&quot;//&quot;, label=&quot;枝刈り&quot;),
+    ]
+    fig.legend(handles=handles, loc=&quot;upper center&quot;, ncol=5, frameon=False, fontsize=10)
+    fig.tight_layout(rect=(0, 0, 1, 0.95))
+
+    anim = FuncAnimation(fig, update, frames=len(steps), interval=interval,
+                         blit=False, repeat=True)
+    return fig, anim
+
+
+# ----------------------------------------------------------------------
+def main():
+    ap = argparse.ArgumentParser(description=&quot;kd-tree 最近傍探索の可視化&quot;)
+    ap.add_argument(&quot;-n&quot;, &quot;--num-points&quot;, type=int, default=20, help=&quot;点の数&quot;)
+    ap.add_argument(&quot;--seed&quot;, type=int, default=0, help=&quot;乱数シード&quot;)
+    ap.add_argument(&quot;--query&quot;, type=float, nargs=2, default=None, help=&quot;クエリ点 (x y)&quot;)
+    ap.add_argument(&quot;--interval&quot;, type=int, default=900, help=&quot;フレーム間隔 [ms]&quot;)
+    ap.add_argument(&quot;--save&quot;, type=str, default=None, help=&quot;GIF の保存先 (例: out.gif)&quot;)
+    args = ap.parse_args()
+
+    rng = np.random.default_rng(args.seed)
+    points = rng.random((args.num_points, 2))
+    q = np.array(args.query) if args.query else rng.random(2)
+
+    root = build_kdtree(points)
+    steps = nn_search_with_trace(root, q)
+
+    # 総当たりで結果を検証
+    brute = points[np.argmin(np.linalg.norm(points - q, axis=1))]
+    assert np.allclose(brute, steps[-1].best.point), &quot;kd-tree の結果が総当たりと一致しません&quot;
+    print(steps[-1].message)
+
+    fig, anim = make_animation(root, q, steps, args.interval)
+    if args.save:
+        anim.save(args.save, writer=PillowWriter(fps=max(1, 1000 // args.interval)))
+        print(f&quot;保存しました: {args.save}&quot;)
+    else:
+        plt.show()
+
+
+if __name__ == &quot;__main__&quot;:
+    main()
+</pre></details>
+<details><summary>kdtree_nn_visualizer_3d.py（3D 版 / Plotly）</summary><pre>&quot;&quot;&quot;
+kd-tree による最近傍探索の 3D 可視化 (Plotly)
+==============================================
+
+3次元点群から kd-tree を構築し、最近傍探索の過程を
+マウスで回転・ズームできる 3D 表示で確認できます。
+ブラウザで開く HTML を出力し、スライダー / 再生ボタンでステップを進めます。
+
+表示内容:
+  - 左 (3D): 分割平面 (x=赤, y=緑, z=青 の半透明面)
+      * 現在ノードの担当領域 (オレンジの箱) と分割平面 (オレンジの面)
+      * 最良候補 (緑) と、その距離を半径とする探索球
+      * 枝刈りされた領域 (グレーの半透明ボックス)
+  - 右: kd-tree の木構造 (現在 / 最良 / 訪問済み / 枝刈り を色分け)
+  - 上部タイトル: 各ステップの説明
+
+使い方:
+  python kdtree_nn_visualizer_3d.py                       # HTML を作ってブラウザで開く
+  python kdtree_nn_visualizer_3d.py -n 40 --seed 3 --query 0.3 0.7 0.5
+  python kdtree_nn_visualizer_3d.py --out result.html --no-open
+
+必要ライブラリ: numpy, plotly
+&quot;&quot;&quot;
+
+import argparse
+import webbrowser
+from dataclasses import dataclass
+from pathlib import Path
+
+import numpy as np
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+
+K = 3
+AXIS_NAME = &quot;xyz&quot;
+AXIS_COLOR = [&quot;#e15759&quot;, &quot;#59a14f&quot;, &quot;#4e79a7&quot;]   # x, y, z の分割平面の色
+C_CUR, C_BEST, C_QUERY, C_VISITED, C_PRUNE = &quot;#f28e2b&quot;, &quot;#2ca02c&quot;, &quot;#d62728&quot;, &quot;#a6c8ff&quot;, &quot;#bbbbbb&quot;
+
+
+# ----------------------------------------------------------------------
+# kd-tree
+# ----------------------------------------------------------------------
+@dataclass
+class Node:
+    point: np.ndarray
+    axis: int
+    lo: np.ndarray            # 担当領域の下限 (k 次元)
+    hi: np.ndarray            # 担当領域の上限
+    left: &quot;Node&quot; = None
+    right: &quot;Node&quot; = None
+    id: int = 0
+    depth: int = 0
+    tx: float = 0.0
+    ty: float = 0.0
+
+
+def build_kdtree(points, depth=0, lo=None, hi=None, counter=None):
+    k = points.shape[1] if len(points) else K
+    lo = np.zeros(k) if lo is None else lo
+    hi = np.ones(k) if hi is None else hi
+    counter = [0] if counter is None else counter
+    if len(points) == 0:
+        return None
+    axis = depth % k
+    pts = points[points[:, axis].argsort()]
+    mid = len(pts) // 2
+    node = Node(pts[mid], axis, lo, hi, id=counter[0], depth=depth)
+    counter[0] += 1
+    s = pts[mid][axis]
+    hi_l, lo_r = hi.copy(), lo.copy()
+    hi_l[axis], lo_r[axis] = s, s
+    node.left = build_kdtree(pts[:mid], depth + 1, lo, hi_l, counter)
+    node.right = build_kdtree(pts[mid + 1:], depth + 1, lo_r, hi, counter)
+    return node
+
+
+def iter_nodes(node):
+    if node is None:
+        return
+    yield node
+    yield from iter_nodes(node.left)
+    yield from iter_nodes(node.right)
+
+
+def layout_tree(root):
+    order = [0]
+
+    def rec(n):
+        if n is None:
+            return
+        rec(n.left)
+        n.tx, n.ty = order[0], -n.depth
+        order[0] += 1
+        rec(n.right)
+
+    rec(root)
+
+
+# ----------------------------------------------------------------------
+# 最近傍探索 (各ステップを記録)
+# ----------------------------------------------------------------------
+@dataclass
+class Step:
+    current: Node
+    best: Node
+    best_dist: float
+    visited: set
+    pruned: list
+    message: str
+
+
+def nn_search_with_trace(root, q):
+    steps, visited, pruned = [], set(), []
+    st = {&quot;best&quot;: None, &quot;dist&quot;: np.inf}
+
+    def snap(cur, msg):
+        steps.append(Step(cur, st[&quot;best&quot;], st[&quot;dist&quot;], set(visited), list(pruned), msg))
+
+    def search(node):
+        if node is None:
+            return
+        visited.add(node.id)
+        d = np.linalg.norm(node.point - q)
+        p = &quot;, &quot;.join(f&quot;{v:.2f}&quot; for v in node.point)
+        snap(node, f&quot;ノード {node.id} ({p}) を訪問  距離 = {d:.3f}  [分割軸: {AXIS_NAME[node.axis]}]&quot;)
+        if d &lt; st[&quot;dist&quot;]:
+            st[&quot;best&quot;], st[&quot;dist&quot;] = node, d
+            snap(node, f&quot;最良候補を更新 → ノード {node.id}  (最短距離 {d:.3f})&quot;)
+
+        diff = q[node.axis] - node.point[node.axis]
+        near, far = (node.left, node.right) if diff &lt; 0 else (node.right, node.left)
+        if near is not None:
+            side = &quot;小さい&quot; if diff &lt; 0 else &quot;大きい&quot;
+            snap(node, f&quot;クエリは {AXIS_NAME[node.axis]} が{side}側 → 近い側の部分木へ降りる&quot;)
+        search(near)
+        if far is None:
+            return
+        if abs(diff) &lt; st[&quot;dist&quot;]:
+            snap(node, f&quot;戻り: 分割平面までの距離 {abs(diff):.3f} &lt; 最短距離 {st[&#x27;dist&#x27;]:.3f} → 反対側も探索&quot;)
+            search(far)
+        else:
+            pruned.append(far)
+            snap(node, f&quot;戻り: 分割平面までの距離 {abs(diff):.3f} ≥ 最短距離 {st[&#x27;dist&#x27;]:.3f} → 反対側を枝刈り&quot;)
+
+    search(root)
+    b = st[&quot;best&quot;]
+    snap(None, f&quot;探索終了: 最近傍はノード {b.id} ({&#x27;, &#x27;.join(f&#x27;{v:.2f}&#x27; for v in b.point)})、&quot;
+               f&quot;距離 {st[&#x27;dist&#x27;]:.3f}  / 訪問 {len(visited)} ノード&quot;)
+    return steps
+
+
+# ----------------------------------------------------------------------
+# 3D 図形ヘルパー
+# ----------------------------------------------------------------------
+def plane_quad(node):
+    &quot;&quot;&quot;ノードの分割平面 (担当領域内) の 4 頂点&quot;&quot;&quot;
+    a = node.axis
+    b, c = [i for i in range(K) if i != a]
+    corners = []
+    for ub, uc in [(0, 0), (1, 0), (1, 1), (0, 1)]:
+        v = np.empty(K)
+        v[a] = node.point[a]
+        v[b] = node.hi[b] if ub else node.lo[b]
+        v[c] = node.hi[c] if uc else node.lo[c]
+        corners.append(v)
+    return np.array(corners)
+
+
+def quads_to_mesh(quads):
+    &quot;&quot;&quot;四角形のリスト → Mesh3d 用 (x, y, z, i, j, k)&quot;&quot;&quot;
+    xs, ys, zs, I, J, Kk = [], [], [], [], [], []
+    for q in quads:
+        base = len(xs)
+        xs += list(q[:, 0]); ys += list(q[:, 1]); zs += list(q[:, 2])
+        I += [base, base]; J += [base + 1, base + 2]; Kk += [base + 2, base + 3]
+    return xs, ys, zs, I, J, Kk
+
+
+def box_quads(lo, hi):
+    &quot;&quot;&quot;直方体の 6 面&quot;&quot;&quot;
+    quads = []
+    for a in range(K):
+        b, c = [i for i in range(K) if i != a]
+        for val in (lo[a], hi[a]):
+            corners = []
+            for ub, uc in [(0, 0), (1, 0), (1, 1), (0, 1)]:
+                v = np.empty(K)
+                v[a] = val
+                v[b] = hi[b] if ub else lo[b]
+                v[c] = hi[c] if uc else lo[c]
+                corners.append(v)
+            quads.append(np.array(corners))
+    return quads
+
+
+def box_edges(lo, hi):
+    &quot;&quot;&quot;直方体の 12 辺 (None 区切りの線分列)&quot;&quot;&quot;
+    xs, ys, zs = [], [], []
+    c = [(x, y, z) for x in (lo[0], hi[0]) for y in (lo[1], hi[1]) for z in (lo[2], hi[2])]
+    for i in range(8):
+        for j in range(i + 1, 8):
+            if sum(c[i][t] != c[j][t] for t in range(3)) == 1:
+                xs += [c[i][0], c[j][0], None]; ys += [c[i][1], c[j][1], None]; zs += [c[i][2], c[j][2], None]
+    return xs, ys, zs
+
+
+def sphere(center, r, n=24):
+    u, v = np.meshgrid(np.linspace(0, 2 * np.pi, n), np.linspace(0, np.pi, n))
+    return (center[0] + r * np.cos(u) * np.sin(v),
+            center[1] + r * np.sin(u) * np.sin(v),
+            center[2] + r * np.cos(v))
+
+
+# ----------------------------------------------------------------------
+# 可視化
+# ----------------------------------------------------------------------
+def build_figure(root, q, steps):
+    nodes = list(iter_nodes(root))
+    layout_tree(root)
+    pts = np.array([n.point for n in nodes])
+
+    fig = make_subplots(rows=1, cols=2, column_widths=[0.62, 0.38],
+                        specs=[[{&quot;type&quot;: &quot;scene&quot;}, {&quot;type&quot;: &quot;xy&quot;}]],
+                        subplot_titles=(&quot;3D 空間分割と探索&quot;, &quot;kd-tree&quot;))
+
+    # ---------- 静的トレース ----------
+    for a in range(K):
+        quads = [plane_quad(n) for n in nodes if n.axis == a]
+        if quads:
+            x, y, z, i, j, k = quads_to_mesh(quads)
+            fig.add_trace(go.Mesh3d(x=x, y=y, z=z, i=i, j=j, k=k, color=AXIS_COLOR[a],
+                                    opacity=0.12, name=f&quot;分割平面 ({AXIS_NAME[a]})&quot;,
+                                    showlegend=True, hoverinfo=&quot;skip&quot;), 1, 1)
+    fig.add_trace(go.Scatter3d(x=pts[:, 0], y=pts[:, 1], z=pts[:, 2], mode=&quot;markers+text&quot;,
+                               marker=dict(size=4, color=&quot;#4a6fa5&quot;),
+                               text=[str(n.id) for n in nodes], textfont=dict(size=10),
+                               textposition=&quot;top center&quot;, name=&quot;データ点&quot;,
+                               hovertemplate=&quot;ノード %{text}&lt;br&gt;(%{x:.2f}, %{y:.2f}, %{z:.2f})&lt;extra&gt;&lt;/extra&gt;&quot;), 1, 1)
+    fig.add_trace(go.Scatter3d(x=[q[0]], y=[q[1]], z=[q[2]], mode=&quot;markers&quot;,
+                               marker=dict(size=7, color=C_QUERY, symbol=&quot;diamond&quot;),
+                               name=&quot;クエリ&quot;), 1, 1)
+    ex, ey = [], []
+    for n in nodes:
+        for c in (n.left, n.right):
+            if c is not None:
+                ex += [n.tx, c.tx, None]; ey += [n.ty, c.ty, None]
+    fig.add_trace(go.Scatter(x=ex, y=ey, mode=&quot;lines&quot;, line=dict(color=&quot;#9aa5b1&quot;, width=1),
+                             hoverinfo=&quot;skip&quot;, showlegend=False), 1, 2)
+
+    # ---------- 動的トレース (フレームごとに更新) ----------
+    dyn_start = len(fig.data)
+
+    def dynamic_traces(st):
+        out = []
+        # 1) 枝刈り領域
+        quads = [qd for p in st.pruned for qd in box_quads(p.lo, p.hi)]
+        x, y, z, i, j, k = quads_to_mesh(quads) if quads else ([], [], [], [], [], [])
+        out.append(go.Mesh3d(x=x, y=y, z=z, i=i, j=j, k=k, color=&quot;#888888&quot;, opacity=0.3,
+                             name=&quot;枝刈り領域&quot;, showlegend=True, hoverinfo=&quot;skip&quot;))
+        # 2) 現在ノードの担当領域 (箱の辺)
+        cur = st.current
+        bx, by, bz = box_edges(cur.lo, cur.hi) if cur else ([], [], [])
+        out.append(go.Scatter3d(x=bx, y=by, z=bz, mode=&quot;lines&quot;, line=dict(color=C_CUR, width=4),
+                                name=&quot;現在ノードの領域&quot;, showlegend=True, hoverinfo=&quot;skip&quot;))
+        # 3) 現在ノードの分割平面
+        if cur:
+            x, y, z, i, j, k = quads_to_mesh([plane_quad(cur)])
+        else:
+            x, y, z, i, j, k = [], [], [], [], [], []
+        out.append(go.Mesh3d(x=x, y=y, z=z, i=i, j=j, k=k, color=C_CUR, opacity=0.45,
+                             showlegend=False, hoverinfo=&quot;skip&quot;))
+        # 4) 現在ノード + クエリへの線
+        cx = [cur.point[0], q[0]] if cur else []
+        cy = [cur.point[1], q[1]] if cur else []
+        cz = [cur.point[2], q[2]] if cur else []
+        out.append(go.Scatter3d(x=cx, y=cy, z=cz, mode=&quot;lines+markers&quot;,
+                                line=dict(color=C_CUR, width=3, dash=&quot;dot&quot;),
+                                marker=dict(size=[9, 0], color=C_CUR), showlegend=False, hoverinfo=&quot;skip&quot;))
+        # 5) 探索球
+        r = st.best_dist if st.best else 0.0
+        sx, sy, sz = sphere(q, r)
+        out.append(go.Surface(x=sx, y=sy, z=sz, opacity=0.18 if st.best else 0,
+                              colorscale=[[0, C_BEST], [1, C_BEST]], showscale=False,
+                              name=&quot;探索球 (半径 = 最短距離)&quot;, showlegend=True,
+                              hoverinfo=&quot;skip&quot;))
+        # 6) 最良候補 + クエリへの線
+        b = st.best
+        out.append(go.Scatter3d(x=[b.point[0], q[0]] if b else [], y=[b.point[1], q[1]] if b else [],
+                                z=[b.point[2], q[2]] if b else [], mode=&quot;lines+markers&quot;,
+                                line=dict(color=C_BEST, width=5),
+                                marker=dict(size=[8, 0], color=C_BEST), name=&quot;最良候補&quot;, showlegend=True,
+                                hoverinfo=&quot;skip&quot;))
+        # 7) 木のノード
+        pruned_ids = {m.id for p in st.pruned for m in iter_nodes(p)}
+        colors = []
+        for n in nodes:
+            if cur is not None and n.id == cur.id:
+                colors.append(C_CUR)
+            elif b is not None and n.id == b.id:
+                colors.append(C_BEST)
+            elif n.id in pruned_ids:
+                colors.append(C_PRUNE)
+            elif n.id in st.visited:
+                colors.append(C_VISITED)
+            else:
+                colors.append(&quot;white&quot;)
+        out.append(go.Scatter(x=[n.tx for n in nodes], y=[n.ty for n in nodes], mode=&quot;markers+text&quot;,
+                              marker=dict(size=20, color=colors, line=dict(color=&quot;#555&quot;, width=1)),
+                              text=[str(n.id) for n in nodes], textfont=dict(size=9),
+                              customdata=[AXIS_NAME[n.axis] for n in nodes],
+                              hovertemplate=&quot;ノード %{text}  分割軸: %{customdata}&lt;extra&gt;&lt;/extra&gt;&quot;,
+                              showlegend=False))
+        return out
+
+    for i, tr in enumerate(dynamic_traces(steps[0])):
+        fig.add_trace(tr, 1, 1 if i &lt; 6 else 2)
+    dyn_idx = list(range(dyn_start, len(fig.data)))
+
+    def title(i):
+        return f&quot;[{i + 1}/{len(steps)}]  {steps[i].message}&quot;
+
+    fig.frames = [go.Frame(data=dynamic_traces(st), traces=dyn_idx, name=str(i),
+                           layout=go.Layout(title_text=title(i)))
+                  for i, st in enumerate(steps)]
+
+    # ---------- レイアウト / コントロール ----------
+    rng = dict(range=[0, 1])
+    fig.update_layout(
+        title=dict(text=title(0), x=0.5, y=0.985, yanchor=&quot;top&quot;, font=dict(size=15)),
+        height=820, width=1400, margin=dict(l=10, r=10, t=120, b=110), plot_bgcolor=&quot;white&quot;,
+        scene=dict(xaxis=dict(title=&quot;x&quot;, **rng), yaxis=dict(title=&quot;y&quot;, **rng),
+                   zaxis=dict(title=&quot;z&quot;, **rng), aspectmode=&quot;cube&quot;,
+                   camera=dict(eye=dict(x=1.6, y=-1.6, z=1.1))),
+        legend=dict(orientation=&quot;h&quot;, x=0, y=1.05, yanchor=&quot;bottom&quot;),
+        updatemenus=[dict(type=&quot;buttons&quot;, x=0.0, y=-0.03, yanchor=&quot;top&quot;, xanchor=&quot;left&quot;, direction=&quot;left&quot;, buttons=[
+            dict(label=&quot;▶ 再生&quot;, method=&quot;animate&quot;,
+                 args=[None, dict(frame=dict(duration=1000, redraw=True), fromcurrent=True,
+                                  transition=dict(duration=0))]),
+            dict(label=&quot;⏸ 停止&quot;, method=&quot;animate&quot;,
+                 args=[[None], dict(frame=dict(duration=0, redraw=False), mode=&quot;immediate&quot;)]),
+        ])],
+        sliders=[dict(active=0, x=0.13, y=-0.02, yanchor=&quot;top&quot;, len=0.87,
+                      currentvalue=dict(prefix=&quot;ステップ &quot;, font=dict(size=12)), pad=dict(t=0, b=0),
+                      steps=[dict(label=str(i + 1), method=&quot;animate&quot;,
+                                  args=[[str(i)], dict(mode=&quot;immediate&quot;, frame=dict(duration=0, redraw=True),
+                                                       transition=dict(duration=0))])
+                             for i in range(len(steps))])],
+    )
+    fig.update_xaxes(visible=False, row=1, col=2)
+    fig.update_yaxes(visible=False, row=1, col=2)
+    return fig
+
+
+def main():
+    ap = argparse.ArgumentParser(description=&quot;kd-tree 最近傍探索の 3D 可視化&quot;)
+    ap.add_argument(&quot;-n&quot;, &quot;--num-points&quot;, type=int, default=25)
+    ap.add_argument(&quot;--seed&quot;, type=int, default=0)
+    ap.add_argument(&quot;--query&quot;, type=float, nargs=3, default=None, help=&quot;クエリ点 (x y z)&quot;)
+    ap.add_argument(&quot;--out&quot;, type=str, default=&quot;kdtree_nn_3d.html&quot;)
+    ap.add_argument(&quot;--no-open&quot;, action=&quot;store_true&quot;, help=&quot;ブラウザを自動で開かない&quot;)
+    args = ap.parse_args()
+
+    rng = np.random.default_rng(args.seed)
+    points = rng.random((args.num_points, K))
+    q = np.array(args.query) if args.query else rng.random(K)
+
+    root = build_kdtree(points)
+    steps = nn_search_with_trace(root, q)
+    brute = points[np.argmin(np.linalg.norm(points - q, axis=1))]
+    assert np.allclose(brute, steps[-1].best.point), &quot;kd-tree の結果が総当たりと一致しません&quot;
+    print(steps[-1].message)
+
+    fig = build_figure(root, q, steps)
+    fig.write_html(args.out, include_plotlyjs=&quot;cdn&quot;, auto_play=False)
+    print(f&quot;保存しました: {args.out}&quot;)
+    if not args.no_open:
+        webbrowser.open(Path(args.out).resolve().as_uri())
+
+
+if __name__ == &quot;__main__&quot;:
+    main()
+</pre></details>
+</body></html>
