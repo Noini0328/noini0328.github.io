@@ -6,11 +6,13 @@
 <title>漢字プリント生成</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Klee+One:wght@400;600&display=swap" rel="stylesheet">
+<style id="pageStyle">@page { size: A4 portrait; margin: 10mm; }</style>
 <style>
   :root { --fs: 48pt; --trace: #c8c8c8; }
   * { box-sizing: border-box; }
   body { margin: 0; font-family: system-ui, "Hiragino Sans", "Yu Gothic UI", sans-serif; background: #e9ebef; color: #222; }
-  .ui { max-width: 1100px; margin: 0 auto; padding: 16px; }
+  .ui { max-width: 1240px; margin: 0 auto; padding: 16px; }
+  #pages { overflow-x: auto; }
   h1 { font-size: 20px; margin: 4px 0 12px; }
   .panel { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; }
   .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
@@ -47,11 +49,13 @@
     width: 210mm; height: 297mm; padding: 10mm; margin: 0 auto 18px;
     background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.2); overflow: hidden;
   }
-  .page-inner { width: 190mm; }
-  .sheet-head { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #333; padding-bottom: 6px; margin-bottom: 4mm; font-family: "UD デジタル 教科書体 N-R","UD Digi Kyokasho N-R","Klee One",serif; }
+  body.land .page { width: 297mm; height: 210mm; }
+  .page-inner { width: 100%; height: 100%; }
+  .vert { writing-mode: vertical-rl; }
+  .sheet-head { display: flex; justify-content: space-between; align-items: flex-end; border-block-end: 2px solid #333; padding-block-end: 6px; margin-block-end: 4mm; font-family: "UD デジタル 教科書体 N-R","UD Digi Kyokasho N-R","Klee One",serif; }
   .sheet-title { font-size: 20pt; }
   .sheet-name { font-size: 13pt; }
-  .sheet-name span { display: inline-block; width: 14em; border-bottom: 1px solid #333; }
+  .sheet-name span { display: inline-block; inline-size: 14em; border-block-end: 1px solid #333; }
 
   .txt {
     font-family: "UD デジタル 教科書体 N-R","UD Digi Kyokasho N-R","Klee One","Hiragino Mincho ProN","Yu Mincho",serif;
@@ -59,25 +63,27 @@
   }
   .line { white-space: nowrap; }
   .u { display: inline-block; white-space: nowrap; vertical-align: baseline; }
-  .u.qs { margin-left: 0.6em; }      /* 問題と問題の間 */
-  .line > .u:first-child { margin-left: 0; }
-  .q-num { font-family: system-ui, sans-serif; font-size: 0.32em; vertical-align: 0.2em; margin-right: 0.3em; color: #333; }
+  .u.qs { margin-inline-start: 0.6em; }      /* 問題と問題の間 */
+  .line > .u:first-child { margin-inline-start: 0; }
+  .q-num { font-family: system-ui, sans-serif; font-size: 0.32em; vertical-align: 0.2em; margin-inline-end: 0.3em; color: #333; }
+  .vert .q-num { vertical-align: baseline; }
+  .vert .q-num .nd { text-combine-upright: all; -webkit-text-combine: horizontal; }
   .box { display: inline-block; vertical-align: baseline; margin: 0 0.04em; text-align: center; }
-  .box .rt { display: flex; justify-content: space-around; font-size: 0.4em; line-height: 1.25; height: 1.25em; padding: 0 0.3em; }
-  .box .fr { display: block; height: 1.2em; line-height: 1.2em; border: 0.035em solid #222; }
+  .box .rt { display: flex; justify-content: space-around; font-size: 0.4em; line-height: 1.25; block-size: 1.25em; padding-inline: 0.3em; }
+  .box .fr { display: block; block-size: 1.2em; line-height: 1.2em; border: 0.035em solid #222; }
   .box .tr { color: var(--trace); visibility: hidden; }
   body.trace .box .tr { visibility: visible; }
   #measure { position: absolute; left: -9999px; top: 0; visibility: hidden; white-space: nowrap; }
-  #measureLines { position: absolute; left: -9999px; top: 0; visibility: hidden; width: 190mm; }
+  #measureLines { position: absolute; left: -9999px; top: 0; visibility: hidden; }
 
   .copy { text-align: center; font-size: 12px; color: #777; padding: 8px 0 16px; }
-  @page { size: A4 portrait; margin: 10mm; }
   @media print {
     body { background: #fff; }
     .ui > *:not(#pages) { display: none !important; }
     .ui { max-width: none; padding: 0; }
     .pv-label { display: none; }
     .page { width: 190mm; height: 276mm; padding: 0; margin: 0; box-shadow: none; break-after: page; page-break-after: always; }
+    body.land .page { width: 277mm; height: 189mm; }
     .page:last-child { break-after: auto; page-break-after: auto; }
     .box .tr { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
@@ -112,7 +118,11 @@
     <div class="row" style="margin-top:10px;">
       <span style="font-size:14px;">モード</span>
       <span class="seg"><button id="modeNormal" class="on">通常</button><button id="modeTrace">なぞりがき</button></span>
-      <button class="primary" id="printBtn">🖨 印刷</button>
+      <span style="font-size:14px;margin-left:8px;">用紙</span>
+      <span class="seg"><button id="orPort" class="on">A4縦</button><button id="orLand">A4横</button></span>
+      <span style="font-size:14px;margin-left:8px;">書き方</span>
+      <span class="seg"><button id="wmH" class="on">横書き</button><button id="wmV">縦書き</button></span>
+      <button class="primary" id="printBtn" style="margin-left:8px;">🖨 印刷</button>
       <span style="width:16px;"></span>
       <button id="saveBtn">問題保存</button>
       <button id="loadBtn">問題読込み</button>
@@ -139,7 +149,7 @@
   // 行頭に来てはいけない文字（前の文字にくっつける）
   const NO_HEAD = /[、。，．,.・ー〜」』）)】〕！？!?ぁぃぅぇぉっゃゅょゎァィゥェォッャュョヮヵ]/;
   const DEFAULT_ITEMS = [{ segments: [{ t: 'q', s: '誇', r: 'ほこ' }, { t: 'text', s: 'りと' }, { t: 'q', s: '使命感', r: 'しめいかん' }] }];
-  const state = { title: '漢字プリント', fontSize: 48, trace: false, items: JSON.parse(JSON.stringify(DEFAULT_ITEMS)) };
+  const state = { title: '漢字プリント', fontSize: 48, trace: false, landscape: false, vertical: false, items: JSON.parse(JSON.stringify(DEFAULT_ITEMS)) };
   let pending = null;
 
   const $ = id => document.getElementById(id);
@@ -252,7 +262,7 @@
       if (g.t === 'q') {
         const w = Array.from(g.s).length + 2;
         const rt = Array.from(g.r || '').map(c => `<span>${esc(c)}</span>`).join('');
-        units.push(`<span class="box"><span class="rt">${rt}</span><span class="fr" style="width:${w}em"><span class="tr">${esc(g.s)}</span></span></span>`);
+        units.push(`<span class="box"><span class="rt">${rt}</span><span class="fr" style="inline-size:${w}em"><span class="tr">${esc(g.s)}</span></span></span>`);
       } else {
         Array.from(g.s).forEach(c => {
           if (units.length && NO_HEAD.test(c)) units[units.length - 1] += esc(c);
@@ -261,7 +271,7 @@
       }
     });
     if (!units.length) units.push('');
-    units[0] = `<span class="q-num">(${n + 1})</span>` + units[0];
+    units[0] = `<span class="q-num">(<span class="nd">${n + 1}</span>)</span>` + units[0];
     return units;
   }
 
@@ -273,17 +283,27 @@
 
   function layout() {
     document.documentElement.style.setProperty('--fs', state.fontSize + 'pt');
-    const FULL = mmToPx(190) - 1;
-    const PAGE_H = mmToPx(275); // 印刷時の高さ(276mm)より少し小さく → はみ出し防止
+    const V = state.vertical, L = state.landscape;
+    document.body.classList.toggle('land', L);
+    $('pageStyle').textContent = `@page { size: A4 ${L ? 'landscape' : 'portrait'}; margin: 10mm; }`;
+    // 用紙の中身の大きさ（mm）。高さは印刷時より1mm小さくして、はみ出しを防ぐ
+    const W = L ? 277 : 190, H = L ? 188 : 275;
+    // 行の長さ（inline方向）と、行を積む方向（block方向）の大きさ
+    const FULL = mmToPx(V ? H : W) - 1;
+    const PAGE_H = mmToPx(V ? W : H) - 1;
+    const inl = r => V ? r.height : r.width;
+    const blk = r => V ? r.width : r.height;
+    const wmClass = V ? ' vert' : '';
 
-    // 1) 単位ごとの幅を測る
+    // 1) 単位ごとの長さを測る
     const qs = state.items.map((it, n) => unitsOf(it, n));
     const meas = $('measure');
+    meas.className = 'txt' + wmClass;
     meas.innerHTML = qs.map(us => us.map(u => `<span class="u">${u}</span>`).join('')).join('<br>');
     const spans = meas.querySelectorAll('.u');
     const gap = parseFloat(getComputedStyle(meas).fontSize) * 0.6;
     let k = 0;
-    const qw = qs.map(us => us.map(() => spans[k++].getBoundingClientRect().width));
+    const qw = qs.map(us => us.map(() => inl(spans[k++].getBoundingClientRect())));
     meas.innerHTML = '';
 
     // 2) 行に詰める：1行に収まる問題は分割しない／収まらない長い問題だけ折り返して空きを埋める
@@ -304,12 +324,14 @@
 
     // 3) 行の高さを測ってページに割り付ける（行の途中で改ページしない）
     const ml = $('measureLines');
+    ml.className = wmClass.trim();
+    ml.style.cssText = V ? `height:${mmToPx(H)}px` : `width:${mmToPx(W)}px`;
     ml.innerHTML = headHTML() + lines.map(l => `<div class="line txt">${l.join('')}</div>`).join('');
-    const headH = ml.firstElementChild.getBoundingClientRect().height + mmToPx(4);
+    const headH = blk(ml.firstElementChild.getBoundingClientRect()) + mmToPx(4);
     const pages = [[]];
     let y = headH;
     ml.querySelectorAll('.line').forEach((el, i) => {
-      const h = el.getBoundingClientRect().height;
+      const h = blk(el.getBoundingClientRect());
       if (y + h > PAGE_H && pages[pages.length - 1].length) { pages.push([]); y = 0; }
       pages[pages.length - 1].push(i);
       y += h;
@@ -318,11 +340,11 @@
 
     // 4) ページとして描画（印刷も同じDOMをそのまま使う）
     $('pages').innerHTML = pages.map((p, pi) =>
-      `<div class="pv-label">${pi + 1} / ${pages.length} ページ</div><div class="page"><div class="page-inner">` +
+      `<div class="pv-label">${pi + 1} / ${pages.length} ページ</div><div class="page"><div class="page-inner${wmClass}">` +
       (pi === 0 ? headHTML() : '') +
       p.map(i => `<div class="line txt">${lines[i].join('')}</div>`).join('') +
       `</div></div>`).join('');
-    $('status').textContent = `${state.items.length} 問 ／ A4縦 ${pages.length} ページ（${state.fontSize}pt）`;
+    $('status').textContent = `${state.items.length} 問 ／ A4${L ? '横' : '縦'}・${V ? '縦書き' : '横書き'} ${pages.length} ページ（${state.fontSize}pt）`;
   }
 
   function renderAll() {
@@ -347,13 +369,23 @@
     $('modeTrace').classList.toggle('on', trace);
     save();
   }
+  function setOpt(key, val) {
+    state[key] = val;
+    $('orPort').classList.toggle('on', !state.landscape); $('orLand').classList.toggle('on', state.landscape);
+    $('wmH').classList.toggle('on', !state.vertical); $('wmV').classList.toggle('on', state.vertical);
+    layout(); save();
+  }
+  $('orPort').onclick = () => setOpt('landscape', false);
+  $('orLand').onclick = () => setOpt('landscape', true);
+  $('wmH').onclick = () => setOpt('vertical', false);
+  $('wmV').onclick = () => setOpt('vertical', true);
   $('modeNormal').onclick = () => setMode(false);
   $('modeTrace').onclick = () => setMode(true);
   $('printBtn').onclick = () => window.print();
 
   // ---------- 保存 / 読込み ----------
   $('saveBtn').onclick = () => {
-    const data = { app: 'kanji-print', version: 1, title: state.title, fontSize: state.fontSize, items: state.items };
+    const data = { app: 'kanji-print', version: 1, title: state.title, fontSize: state.fontSize, landscape: state.landscape, vertical: state.vertical, items: state.items };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     const d = new Date(), p2 = v => String(v).padStart(2, '0');
@@ -371,7 +403,10 @@
       state.items = data.items.map(it => ({ segments: (it.segments || []).map(g => g.t === 'q' ? { t: 'q', s: String(g.s), r: String(g.r || '') } : { t: 'text', s: String(g.s) }) }));
       if (data.title != null) state.title = String(data.title);
       if (data.fontSize) state.fontSize = Number(data.fontSize);
+      if ('landscape' in data) state.landscape = !!data.landscape;
+      if ('vertical' in data) state.vertical = !!data.vertical;
       $('fsInput').value = state.fontSize;
+      setOpt('landscape', state.landscape);
       renderAll(); save();
     } catch (err) { showMsg('読み込みに失敗しました：' + err.message); }
     e.target.value = '';
@@ -399,6 +434,7 @@
 
   $('fsInput').value = state.fontSize;
   setMode(!!state.trace);
+  setOpt('landscape', !!state.landscape);
   renderAll();
   if (document.fonts) document.fonts.ready.then(layout);
   mainInput.focus();
