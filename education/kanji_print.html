@@ -41,6 +41,11 @@
   .it .n { color: #888; font-size: 12px; }
   .it .k { color: #2b6cb0; font-weight: bold; }
   .it button { padding: 1px 6px; font-size: 12px; }
+  .it { cursor: grab; user-select: none; }
+  .it.dragging { opacity: .35; }
+  .it.drop-before { box-shadow: -4px 0 0 #2b6cb0; }
+  .it.drop-after { box-shadow: 4px 0 0 #2b6cb0; }
+  .it.editing { border-color: #d69e2e; background: #fffbea; }
   .empty { color: #888; font-size: 14px; }
 
   /* ===== プリント（画面プレビュー＝印刷と同じページ割り） ===== */
@@ -98,10 +103,13 @@
       <input type="text" id="mainInput" placeholder="例：誇りと使命感（Enterで追加）" autocomplete="off">
       <button class="primary" id="addBtn">追加</button>
     </div>
+    <div id="editNote" style="display:none;margin-top:6px;font-size:13px;color:#b7791f;font-weight:bold;"></div>
     <div class="hint">
       Enterを押すと、ひらがな・カタカナ以外の漢字部分が問題になります。続けて読み（ふりがな）を入力 → Enter で問題が追加され、入力欄に戻ります。<br>
       読みを最初から指定する場合：<code>誇[ほこ]りと使命感[しめいかん]</code> または <code>使命感（しめいかん）</code> の形式で入力できます。<br>
-      問題にしたくない漢字は前に <code>/</code> または <code>\</code> を付けます：<code>/学校で漢字[かんじ]を/書く</code> →「学校」「書」はそのまま表示、「漢字」だけが問題。記号自体を表示したいときは <code>//</code> や <code>\\</code> のように2つ重ねます。
+      問題にしたくない漢字は前に <code>/</code> または <code>\</code> を付けます：<code>/学校で漢字[かんじ]を/書く</code> →「学校」「書」はそのまま表示、「漢字」だけが問題。<br>
+      漢字が続くときに途中から問題にしたい場合は、間に半角スペースを入れます：<code>\漢 字</code> →「漢」はそのまま表示、「字」だけが問題（スペースは表示されません）。<br>
+      記号自体を表示したいときは <code>//</code> や <code>\\</code> のように2つ重ねます。
     </div>
   </div>
 
@@ -133,7 +141,7 @@
   </div>
 
   <div class="panel">
-    <div style="font-size:13px;color:#555;margin-bottom:6px;">問題一覧（並べ替え・編集・削除）</div>
+    <div style="font-size:13px;color:#555;margin-bottom:6px;">問題一覧（ドラッグまたは↑↓で並べ替え・編集・削除）</div>
     <div id="itemList"></div>
   </div>
 
@@ -152,6 +160,7 @@
   const DEFAULT_ITEMS = [{ segments: [{ t: 'q', s: '誇', r: 'ほこ' }, { t: 'text', s: 'りと' }, { t: 'q', s: '使命感', r: 'しめいかん' }] }];
   const state = { title: '漢字プリント', fontSize: 48, trace: false, landscape: false, vertical: false, items: JSON.parse(JSON.stringify(DEFAULT_ITEMS)) };
   let pending = null;
+  let editing = null;   // 編集中の問題（同じ位置に戻す）
 
   const $ = id => document.getElementById(id);
   const mainInput = $('mainInput');
@@ -172,6 +181,8 @@
         if (i + 1 < chars.length && KANJI.test(chars[i + 1])) {
           i++;
           while (i < chars.length && KANJI.test(chars[i])) buf += chars[i++];
+          // 「\漢 字」：エスケープした漢字の直後の半角スペースは区切りとして消す（続く漢字は問題になる）
+          if (chars[i] === ' ' && KANJI.test(chars[i + 1] || '')) i++;
           continue;
         }
         buf += chars[i++];
@@ -194,8 +205,12 @@
     return segs;
   }
   const KANJI_RUN = /[\p{Script=Han}々〆〇ヶ]+/gu;
-  const toNotation = segs => segs.map(g => g.t === 'q' ? `${g.s}[${g.r}]`
-    : g.s.replace(/[\/／\\＼¥￥](?=[\/／\\＼¥￥\p{Script=Han}々〆〇ヶ])/gu, m => m + m).replace(KANJI_RUN, m => '/' + m)).join('');
+  const toNotation = segs => segs.map((g, i) => {
+    if (g.t === 'q') return `${g.s}[${g.r}]`;
+    let t = g.s.replace(/[\/／\\＼¥￥](?=[\/／\\＼¥￥\p{Script=Han}々〆〇ヶ])/gu, m => m + m).replace(KANJI_RUN, m => '/' + m);
+    if (segs[i + 1] && segs[i + 1].t === 'q' && KANJI.test(Array.from(g.s).pop())) t += ' ';   // 区切りのスペース
+    return t;
+  }).join('');
 
   // ---------- 入力 ----------
   function submitMain() {
@@ -233,7 +248,10 @@
   }
   function cancelReading() { pending = null; $('readingPanel').style.display = 'none'; mainInput.focus(); }
   function commit(segs) {
-    state.items.push({ segments: segs.map(g => g.t === 'q' ? { t: 'q', s: g.s, r: g.r || '' } : { t: 'text', s: g.s }) });
+    const item = { segments: segs.map(g => g.t === 'q' ? { t: 'q', s: g.s, r: g.r || '' } : { t: 'text', s: g.s }) };
+    const idx = editing ? state.items.indexOf(editing) : -1;
+    if (idx >= 0) state.items[idx] = item; else state.items.push(item);
+    setEditing(null);
     pending = null;
     $('readingPanel').style.display = 'none';
     mainInput.value = '';
@@ -243,17 +261,28 @@
   mainInput.addEventListener('keydown', e => {
     if (e.isComposing || e.keyCode === 229) return;
     if (e.key === 'Enter') { e.preventDefault(); submitMain(); }
+    if (e.key === 'Escape' && editing) { mainInput.value = ''; setEditing(null); renderList(); }
   });
+  function setEditing(item) {
+    editing = item;
+    $('addBtn').textContent = item ? '更新' : '追加';
+    $('editNote').style.display = item ? '' : 'none';
+    if (item) $('editNote').textContent = `(${state.items.indexOf(item) + 1}) を編集中 — Enterで同じ位置に更新／Escで取り消し`;
+  }
   $('addBtn').onclick = submitMain;
 
   // ---------- 問題一覧（編集用） ----------
+  let dragFrom = null;
+  const clearMarks = () => document.querySelectorAll('.drop-before,.drop-after').forEach(x => x.classList.remove('drop-before', 'drop-after'));
   function renderList() {
     const list = $('itemList');
     if (!state.items.length) { list.innerHTML = '<span class="empty">問題はまだありません。</span>'; return; }
     list.innerHTML = '';
     state.items.forEach((item, n) => {
       const el = document.createElement('span');
-      el.className = 'it';
+      el.className = 'it' + (item === editing ? ' editing' : '');
+      el.draggable = true;
+      el.title = 'ドラッグで並べ替え';
       el.innerHTML = `<span class="n">(${n + 1})</span>` +
         item.segments.map(g => g.t === 'q' ? `<span class="k">${esc(g.s)}</span>` : esc(g.s)).join('') +
         ` <button data-a="up">↑</button><button data-a="down">↓</button><button data-a="edit">編集</button><button data-a="del">削除</button>`;
@@ -263,8 +292,35 @@
         if (a === 'del') it.splice(n, 1);
         if (a === 'up' && n > 0) [it[n - 1], it[n]] = [it[n], it[n - 1]];
         if (a === 'down' && n < it.length - 1) [it[n + 1], it[n]] = [it[n], it[n + 1]];
-        if (a === 'edit') { mainInput.value = toNotation(item.segments); it.splice(n, 1); mainInput.focus(); }
+        if (a === 'del' && item === editing) { setEditing(null); mainInput.value = ''; }
+        if (a === 'edit') { mainInput.value = toNotation(item.segments); setEditing(item); renderList(); mainInput.focus(); return; }
         renderAll(); save();
+        if (editing) setEditing(editing);   // 番号表示を更新
+      });
+      // --- ドラッグで並べ替え ---
+      el.addEventListener('dragstart', e => {
+        dragFrom = n; el.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        try { e.dataTransfer.setData('text/plain', String(n)); } catch (_) {}
+      });
+      el.addEventListener('dragend', () => { dragFrom = null; clearMarks(); el.classList.remove('dragging'); });
+      el.addEventListener('dragover', e => {
+        if (dragFrom == null) return;
+        e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+        const r = el.getBoundingClientRect(), after = e.clientX > r.left + r.width / 2;
+        clearMarks(); el.classList.add(after ? 'drop-after' : 'drop-before');
+      });
+      el.addEventListener('drop', e => {
+        e.preventDefault();
+        if (dragFrom == null) return;
+        const r = el.getBoundingClientRect(), after = e.clientX > r.left + r.width / 2;
+        let to = n + (after ? 1 : 0);
+        const [moved] = state.items.splice(dragFrom, 1);
+        if (dragFrom < to) to--;
+        state.items.splice(to, 0, moved);
+        dragFrom = null;
+        renderAll(); save();
+        if (editing) setEditing(editing);
       });
       list.appendChild(el);
     });
@@ -276,9 +332,13 @@
     const units = [];
     item.segments.forEach(g => {
       if (g.t === 'q') {
-        const w = Array.from(g.s).length + 2;
+        const w = Array.from(g.s).length + 1;   // 漢字の文字数＋前後半角1文字ずつ（0.5em×2）
         const rt = Array.from(g.r || '').map(c => `<span>${esc(c)}</span>`).join('');
-        units.push(`<span class="box"><span class="rt">${rt}</span><span class="fr" style="inline-size:${w}em"><span class="tr">${esc(g.s)}</span></span></span>`);
+        // ふりがなが枠より長いときは、枠の幅に収まるよう小さくする（行の高さは変えない）
+        const rlen = Array.from(g.r || '').length;
+        const rfs = Math.min(0.4, w / (rlen + 0.6));
+        const rtStyle = rfs < 0.4 ? ` style="font-size:${rfs}em;block-size:${0.5 / rfs}em;line-height:${0.5 / rfs}em"` : '';
+        units.push(`<span class="box"><span class="rt"${rtStyle}>${rt}</span><span class="fr" style="inline-size:${w}em"><span class="tr">${esc(g.s)}</span></span></span>`);
       } else {
         Array.from(g.s).forEach(c => {
           if (units.length && NO_HEAD.test(c)) units[units.length - 1] += esc(c);
