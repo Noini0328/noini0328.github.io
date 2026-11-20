@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>週間予定表メーカー</title>
+<style id="pageStyle"></style>
+<style>
+:root{--axisW:52px;--line:#d9dee5;--bg:#f6f8fb}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Hiragino Maru Gothic ProN","BIZ UDPGothic","Meiryo",system-ui,sans-serif;background:var(--bg);color:#2b2f36}
+.toolbar{position:sticky;top:0;z-index:20;background:#fff;border-bottom:1px solid #e3e7ee;padding:8px 12px;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;box-shadow:0 2px 6px rgba(0,0,0,.04)}
+.toolbar .grp{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.toolbar .sep{width:1px;height:26px;background:#e3e7ee}
+button{font:inherit;font-size:14px;border:1px solid #cfd6e0;background:#fff;border-radius:10px;padding:6px 12px;cursor:pointer;color:#2b2f36}
+button:hover{background:#f0f4fa}
+button.primary{background:#3b82f6;color:#fff;border-color:#3b82f6}
+button.primary:hover{background:#2f6fd8}
+button.danger{color:#d33;border-color:#f0b4b4}
+select,input[type=text]{font:inherit;font-size:14px;padding:5px 8px;border:1px solid #cfd6e0;border-radius:8px;background:#fff}
+.lbl-s{font-size:13px;color:#556}
+.help{font-size:13px;color:#667;margin:10px auto 0;max-width:1200px;padding:0 16px;line-height:1.7}
+.help b{color:#3b5998}
+#sheet{background:#fff;margin:10px auto 24px;max-width:1200px;padding:14px 16px 16px;border-radius:14px;box-shadow:0 2px 12px rgba(0,0,0,.06)}
+#titleInput{display:block;width:100%;border:none;font:inherit;font-size:26px;font-weight:700;text-align:center;padding:4px;margin-bottom:8px;background:transparent;color:#2b2f36}
+#titleInput:focus{outline:2px dashed #9ec1ff;border-radius:8px}
+#grid{display:grid;grid-template-columns:var(--axisW) repeat(7,1fr);border:1px solid #c9d1dc;border-radius:8px;overflow:hidden;user-select:none;-webkit-user-select:none}
+.corner{border-bottom:1px solid #c9d1dc;background:#f3f6fa}
+.dayhead{text-align:center;font-weight:700;font-size:16px;padding:6px 0;border-left:1px solid var(--line);border-bottom:1px solid #c9d1dc;background:#f3f6fa;position:relative;cursor:context-menu}
+.dayhead.sat{color:#2563eb;background:#eef4ff}
+.dayhead.sun{color:#dc2626;background:#fff0f0}
+.dayhead .copybtn{position:absolute;right:4px;top:50%;transform:translateY(-50%);font-size:11px;padding:1px 6px;border-radius:6px;opacity:0;transition:opacity .15s}
+.dayhead:hover .copybtn{opacity:1}
+.axis{position:relative;height:var(--bodyH)}
+.axis .tl{position:absolute;right:6px;font-size:12px;color:#667;transform:translateY(-50%)}
+.col{position:relative;height:var(--bodyH);border-left:1px solid var(--line);cursor:crosshair;touch-action:none}
+.col.sat{background:#f4f8ff}
+.col.sun{background:#fff6f6}
+.col .hl{position:absolute;left:0;right:0;border-top:1px solid var(--line);pointer-events:none}
+.col .hl.half{border-top:1px dashed #eceff3}
+.ev{position:absolute;border-radius:6px;padding:2px 5px;font-size:13px;line-height:1.2;overflow:hidden;cursor:grab;border:1px solid rgba(0,0,0,.2);box-shadow:0 1px 2px rgba(0,0,0,.08);touch-action:none;z-index:2}
+.ev .t{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ev .tm{font-size:11px;opacity:.8;white-space:nowrap}
+.ev .mm{font-size:11px;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ev.short{display:flex;align-items:center;gap:4px;padding-top:0;padding-bottom:0}
+.ev.short .tm,.ev.short .mm{display:none}
+.ev .h{position:absolute;left:0;right:0;height:7px;cursor:ns-resize}
+.ev .h.top{top:0}
+.ev .h.bot{bottom:0}
+.ev.dragging{opacity:.9;z-index:10;cursor:grabbing;box-shadow:0 4px 14px rgba(0,0,0,.28)}
+.sel{position:absolute;left:2px;right:2px;background:rgba(59,130,246,.15);border:2px dashed #3b82f6;border-radius:6px;pointer-events:none;z-index:5;font-size:12px;color:#1d4ed8;padding:2px 4px}
+#legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:10px;font-size:13px;min-height:18px}
+#legend .it{display:flex;align-items:center;gap:5px}
+#legend .sw{width:16px;height:16px;border-radius:4px;border:1px solid rgba(0,0,0,.2)}
+#legend .sum{color:#778;font-size:12px}
+.empty-hint{grid-column:2 / span 7}
+.menu{position:fixed;z-index:100;background:#fff;border:1px solid #d5dbe4;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:6px;min-width:220px;max-width:340px;max-height:75vh;overflow:auto;display:none}
+.menu .hd{font-size:12px;color:#778;padding:4px 8px}
+.menu .mi{display:block;width:100%;text-align:left;border:none;border-radius:8px;padding:7px 10px;background:none}
+.menu .mi:hover{background:#eef3fb}
+.menu .mi.danger{color:#d33}
+.menu .chips{display:flex;flex-wrap:wrap;gap:5px;padding:2px 6px 8px}
+.menu .chip{border-radius:999px;padding:4px 10px;font-size:13px;border:1px solid rgba(0,0,0,.18)}
+.menu .chip:hover{filter:brightness(.95)}
+.menu hr{border:none;border-top:1px solid #eee;margin:4px}
+dialog{border:none;border-radius:16px;padding:18px 20px;box-shadow:0 10px 40px rgba(0,0,0,.25);width:min(440px,94vw);color:#2b2f36}
+dialog::backdrop{background:rgba(20,30,50,.35)}
+dialog h3{margin:0 0 12px}
+.frow{display:flex;gap:10px;align-items:center;margin:9px 0}
+.frow > .k{width:76px;font-size:14px;color:#555;flex:none}
+.frow input[type=text]{flex:1}
+.frow input[type=color]{width:48px;height:32px;border:1px solid #cfd6e0;border-radius:8px;padding:2px;background:#fff}
+.days{display:flex;gap:4px;flex-wrap:wrap}
+.days label{border:1px solid #cfd6e0;border-radius:8px;padding:3px 7px;font-size:13px;cursor:pointer}
+.days label:has(input:disabled){opacity:.35}
+.chk{font-size:13px;color:#555;display:flex;gap:6px;align-items:center}
+.dlgbtns{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+.dlgbtns .left{margin-right:auto}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#2b2f36;color:#fff;padding:8px 16px;border-radius:999px;font-size:14px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:200}
+.toast.show{opacity:.92}
+@media print{
+  body{background:#fff}
+  .toolbar,.help,.menu,.toast,.no-print{display:none!important}
+  #sheet{box-shadow:none;margin:0;padding:0;max-width:none;border-radius:0}
+  #titleInput{font-size:18pt;margin-bottom:2mm;padding:0}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .ev{font-size:8.5pt;box-shadow:none;padding:0.5mm 1mm;border-radius:3px}
+  .ev .tm,.ev .mm{font-size:6.5pt}
+  .axis .tl{font-size:7.5pt}
+  .dayhead{padding:1.2mm 0;font-size:11pt}
+  #legend{font-size:8.5pt;margin-top:2.5mm;gap:1mm 5mm}
+  #legend .sw{width:3.5mm;height:3.5mm}
+}
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <div class="grp">
+    <span class="lbl-s">開始</span><select id="setStart"></select>
+    <span class="lbl-s">〜 終了</span><select id="setEnd"></select>
+    <span class="lbl-s">時間の刻み</span>
+    <select id="setSnap"><option value="5">5分</option><option value="10">10分</option><option value="15">15分</option><option value="30">30分</option></select>
+    <span class="lbl-s">印刷の向き</span>
+    <select id="setOrient"><option value="landscape">A4 横</option><option value="portrait">A4 縦</option></select>
+  </div>
+  <span class="sep"></span>
+  <div class="grp">
+    <button id="btnUndo" title="Ctrl+Z">元に戻す</button>
+    <button id="btnSample">サンプル</button>
+    <button id="btnExport">JSON保存</button>
+    <button id="btnImport">JSON読み込み</button>
+    <button id="btnReset" class="danger">初期化</button>
+    <button id="btnPrint" class="primary">印刷</button>
+  </div>
+  <input type="file" id="fileInput" accept=".json,application/json" hidden>
+</div>
+
+<div class="help">
+  <b>追加：</b>空いている所をクリック・ドラッグ・右クリック
+  <b>移動：</b>予定をドラッグ
+  <b>時間の変更：</b>予定の上端・下端をドラッグ
+  <b>編集：</b>予定をクリック（右クリックでコピー・削除）
+  <b>曜日ごとコピー：</b>曜日名を右クリック
+</div>
+
+<div id="sheet">
+  <input id="titleInput" class="title-input" type="text" spellcheck="false">
+  <div id="grid"></div>
+  <div id="legend"></div>
+</div>
+
+<div id="menu" class="menu"></div>
+<div id="toast" class="toast"></div>
+<datalist id="titleList"></datalist>
+
+<dialog id="dlgEdit">
+  <h3 id="dlgEditTitle">予定</h3>
+  <div class="frow"><span class="k">項目名</span><input type="text" id="fTitle" list="titleList" placeholder="例：勉強"></div>
+  <div class="frow"><span class="k">色</span><input type="color" id="fColor"><span class="lbl-s">（同じ項目名はすべてこの色になります）</span></div>
+  <div class="frow"><span class="k">曜日</span><select id="fDay"></select></div>
+  <div class="frow"><span class="k">時間</span><select id="fStart"></select><span>〜</span><select id="fEnd"></select></div>
+  <div class="frow"><span class="k">メモ</span><input type="text" id="fMemo" placeholder="（任意）"></div>
+  <div class="frow" id="rowRename"><span class="k"></span><label class="chk"><input type="checkbox" id="fRenameAll">同じ項目名の予定をすべて名前変更する</label></div>
+  <div class="frow" style="align-items:flex-start"><span class="k">他の曜日<br>にもコピー</span><div class="days" id="fCopyDays"></div></div>
+  <div class="dlgbtns">
+    <button class="left danger" id="fDelete">削除</button>
+    <button id="fCancel">キャンセル</button>
+    <button class="primary" id="fSave">OK</button>
+  </div>
+</dialog>
+
+<dialog id="dlgCopyDay">
+  <h3 id="cdTitle">曜日をコピー</h3>
+  <div class="frow" style="align-items:flex-start"><span class="k">コピー先</span><div class="days" id="cdDays"></div></div>
+  <div class="frow"><span class="k"></span><label class="chk"><input type="checkbox" id="cdOverwrite" checked>コピー先の予定を消してからコピーする</label></div>
+  <div class="dlgbtns">
+    <button id="cdCancel">キャンセル</button>
+    <button class="primary" id="cdOk">コピー</button>
+  </div>
+</dialog>
+
+<script>
+(() => {
+'use strict';
+const DAYS = ['月','火','水','木','金','土','日'];
+const LS_KEY = 'kidsWeeklyPlanner.v1';
+const PALETTE = ['#ff9b9b','#ffbf69','#ffe066','#8ce99a','#74c0fc','#b197fc','#f9a8d4','#63e6be',
+                 '#c0eb75','#91a7ff','#e599f7','#ffd8a8','#66d9e8','#d4b896','#ced4da','#ffc9c9',
+                 '#a5d8ff','#d8f5a2'];
+const PRESETS = ['起床','身支度','食事','学校','宿題','勉強','習い事',
+                 '遊び','テレビ・ゲーム','お手伝い','読書','お風呂','就寝'];
+
+const $ = id => document.getElementById(id);
+const grid = $('grid'), menu = $('menu');
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+const uid = () => Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4);
+const fmt = m => `${Math.floor(m/60)}:${String(m%60).padStart(2,'0')}`;
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function defaultState(){
+  return { version:1, title:'週間予定表',
+    settings:{ startMin:360, endMin:1320, snap:15, orientation:'landscape' },
+    colors:{}, events:[] };
+}
+function normalize(d){
+  if (!d || typeof d !== 'object' || !Array.isArray(d.events)) throw new Error('ファイルの形式が正しくありません');
+  const s = defaultState();
+  const st = Object.assign({}, s.settings, d.settings || {});
+  st.startMin = clamp(+st.startMin || 0, 0, 1410);
+  st.endMin = clamp(+st.endMin || 1440, st.startMin + 30, 1440);
+  st.snap = [5,10,15,30].includes(+st.snap) ? +st.snap : 15;
+  st.orientation = st.orientation === 'portrait' ? 'portrait' : 'landscape';
+  const colors = {};
+  if (d.colors && typeof d.colors === 'object')
+    for (const [k,v] of Object.entries(d.colors)) if (/^#[0-9a-f]{6}$/i.test(v)) colors[k] = v;
+  const events = d.events
+    .filter(e => e && typeof e.title === 'string')
+    .map(e => ({ id: String(e.id || uid()), day: clamp(Math.floor(+e.day) || 0, 0, 6),
+      start: clamp(Math.round(+e.start) || 0, 0, 1440), end: clamp(Math.round(+e.end) || 0, 0, 1440),
+      title: e.title, memo: typeof e.memo === 'string' ? e.memo : '' }))
+    .filter(e => e.end > e.start);
+  return { version:1, title: typeof d.title === 'string' ? d.title : s.title, settings: st, colors, events };
+}
+function load(){
+  try { const s = localStorage.getItem(LS_KEY); if (s) return normalize(JSON.parse(s)); } catch(e) {}
+  return defaultState();
+}
+function save(){ try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch(e) {} }
+
+let state = load();
+let history = [];
+function mutate(fn){
+  history.push(JSON.stringify(state));
+  if (history.length > 100) history.shift();
+  fn();
+  save(); syncSettingsUI(); render();
+}
+function undo(){
+  if (!history.length) { toast('元に戻せる操作はありません'); return; }
+  state = JSON.parse(history.pop());
+  save(); syncSettingsUI(); render(); toast('1つ前の状態に戻しました');
+}
+
+/* ---------- colors ---------- */
+function hslToHex(h,s,l){
+  s/=100; l/=100; const k = n => (n + h/30) % 12; const a = s*Math.min(l,1-l);
+  const f = n => l - a*Math.max(-1, Math.min(k(n)-3, Math.min(9-k(n), 1)));
+  return '#' + [f(0),f(8),f(4)].map(x => Math.round(x*255).toString(16).padStart(2,'0')).join('');
+}
+function colorFor(title){
+  if (!state.colors[title]) {
+    const used = new Set(Object.values(state.colors).map(c => c.toLowerCase()));
+    let c = PALETTE.find(p => !used.has(p));
+    if (!c) { let n = used.size; do { c = hslToHex((n*137.508)%360, 70, 74); n++; } while (used.has(c)); }
+    state.colors[title] = c;
+  }
+  return state.colors[title];
+}
+function textColor(hex){
+  const n = parseInt(hex.slice(1),16); const r=n>>16&255, g=n>>8&255, b=n&255;
+  return (0.299*r + 0.587*g + 0.114*b)/255 > 0.58 ? '#1f2328' : '#ffffff';
+}
+
+/* ---------- page style (screen height / print size) ---------- */
+function applyPageStyle(){
+  const { startMin:S, endMin:E, orientation:o } = state.settings;
+  const hours = (E - S)/60;
+  const px = Math.max(480, Math.round(hours * 54));
+  $('pageStyle').textContent =
+    `#grid{--bodyH:${px}px}
+     @media print{ @page{size:A4 ${o};margin:8mm} #grid{--bodyH:${o==='landscape'?'156mm':'232mm'} !important} }`;
+}
+
+/* ---------- render ---------- */
+function layout(evs){
+  evs.sort((a,b) => a.start - b.start || (b.end-b.start) - (a.end-a.start));
+  const out = []; let cluster = [], lanes = [], cEnd = -1;
+  const flush = () => { cluster.forEach(o => o.n = lanes.length); cluster = []; lanes = []; cEnd = -1; };
+  for (const e of evs) {
+    if (cluster.length && e.start >= cEnd) flush();
+    let i = lanes.findIndex(end => end <= e.start);
+    if (i < 0) { i = lanes.length; lanes.push(e.end); } else lanes[i] = e.end;
+    const o = { e, lane:i }; cluster.push(o); out.push(o); cEnd = Math.max(cEnd, e.end);
+  }
+  flush(); return out;
+}
+function pct(m){ const {startMin:S,endMin:E} = state.settings; return ((m - S)/(E - S)*100) + '%'; }
+
+function render(){
+  applyPageStyle();
+  const { startMin:S, endMin:E } = state.settings;
+  if (document.activeElement !== $('titleInput')) $('titleInput').value = state.title;
+  grid.innerHTML = '';
+  const corner = document.createElement('div'); corner.className = 'corner'; grid.appendChild(corner);
+  DAYS.forEach((d,i) => {
+    const h = document.createElement('div');
+    h.className = 'dayhead' + (i===5 ? ' sat' : i===6 ? ' sun' : '');
+    h.dataset.day = i;
+    h.innerHTML = `${d}<button class="copybtn no-print" data-day="${i}" title="この曜日をコピー">コピー</button>`;
+    grid.appendChild(h);
+  });
+  const axis = document.createElement('div'); axis.className = 'axis';
+  for (let m = Math.ceil(S/60)*60; m <= E; m += 60) {
+    const t = document.createElement('div'); t.className = 'tl'; t.textContent = fmt(m);
+    t.style.top = pct(m);
+    if (m === S) t.style.transform = 'translateY(2px)';
+    if (m === E) t.style.transform = 'translateY(-100%)';
+    axis.appendChild(t);
+  }
+  grid.appendChild(axis);
+  for (let d = 0; d < 7; d++) {
+    const col = document.createElement('div'); col.className = 'col' + (d===5 ? ' sat' : d===6 ? ' sun' : ''); col.dataset.day = d;
+    for (let m = Math.ceil(S/30)*30; m < E; m += 30) {
+      if (m === S) continue;
+      const l = document.createElement('div'); l.className = 'hl' + (m % 60 ? ' half' : '');
+      l.style.top = pct(m); col.appendChild(l);
+    }
+    const evs = state.events.filter(e => e.day === d && e.end > S && e.start < E);
+    for (const o of layout(evs)) col.appendChild(makeEvEl(o.e, o.lane, o.n));
+    grid.appendChild(col);
+  }
+  renderLegend();
+}
+function makeEvEl(e, lane=0, n=1){
+  const el = document.createElement('div'); el.className = 'ev'; el.dataset.id = e.id;
+  const c = colorFor(e.title);
+  el.style.background = c; el.style.color = textColor(c);
+  el.style.left = `calc(${lane/n*100}% + 2px)`; el.style.width = `calc(${100/n}% - 4px)`;
+  el.innerHTML = `<div class="t"></div><div class="tm"></div><div class="mm"></div><div class="h top"></div><div class="h bot"></div>`;
+  el.querySelector('.t').textContent = e.title;
+  el.querySelector('.mm').textContent = e.memo || '';
+  el.title = `${e.title}\n${fmt(e.start)}〜${fmt(e.end)}${e.memo ? '\n' + e.memo : ''}`;
+  setEvGeom(el, e.start, e.end);
+  return el;
+}
+function setEvGeom(el, start, end){
+  const { startMin:S, endMin:E } = state.settings;
+  const a = Math.max(start, S), b = Math.min(end, E);
+  el.style.top = pct(a);
+  el.style.height = `calc(${(b - a)/(E - S)*100}% - 1px)`;
+  el.querySelector('.tm').textContent = `${fmt(start)}〜${fmt(end)}`;
+  const colH = grid.querySelector('.col')?.getBoundingClientRect().height || 800;
+  el.classList.toggle('short', (b - a)/(E - S)*colH < 34);
+}
+function renderLegend(){
+  const sums = {};
+  for (const e of state.events) sums[e.title] = (sums[e.title] || 0) + (e.end - e.start);
+  const items = Object.entries(sums).sort((a,b) => b[1] - a[1]);
+  const L = $('legend');
+  if (!items.length) { L.innerHTML = '<span class="lbl-s no-print">まだ予定がありません。表の中をクリックして追加してください（「サンプル」で例を表示できます）</span>'; return; }
+  L.innerHTML = items.map(([t,m]) => {
+    const h = Math.floor(m/60), mm = m%60;
+    return `<span class="it"><span class="sw" style="background:${colorFor(t)}"></span>${esc(t)}<span class="sum">週 ${h ? h+'時間' : ''}${mm ? mm+'分' : ''}</span></span>`;
+  }).join('');
+  $('titleList').innerHTML = [...new Set([...items.map(i=>i[0]), ...PRESETS])].map(t => `<option value="${esc(t)}">`).join('');
+}
+
+/* ---------- geometry helpers ---------- */
+function minuteAt(col, y){
+  const { startMin:S, endMin:E } = state.settings;
+  const r = col.getBoundingClientRect();
+  return S + (y - r.top)/r.height*(E - S);
+}
+function colAtX(x){
+  const cols = [...grid.querySelectorAll('.col')];
+  let best = cols[0], bd = Infinity;
+  for (const c of cols) {
+    const r = c.getBoundingClientRect();
+    if (x >= r.left && x < r.right) return c;
+    const d = Math.min(Math.abs(x - r.left), Math.abs(x - r.right));
+    if (d < bd) { bd = d; best = c; }
+  }
+  return best;
+}
+const snapM = m => Math.round(m/state.settings.snap)*state.settings.snap;
+const findEv = id => state.events.find(e => e.id === id);
+
+/* ---------- pointer interactions ---------- */
+let menuWasOpen = false;
+grid.addEventListener('pointerdown', e => {
+  menuWasOpen = menu.style.display === 'block';
+  if (e.button !== 0) return;
+  closeMenu();
+  const evEl = e.target.closest('.ev'), col = e.target.closest('.col');
+  if (evEl) { e.preventDefault(); startEvDrag(e, evEl); }
+  else if (col) { e.preventDefault(); startSelect(e, col); }
+});
+
+function startEvDrag(e, el){
+  const id = el.dataset.id, ev = findEv(id); if (!ev) return;
+  const mode = e.target.classList.contains('top') ? 'top' : e.target.classList.contains('bot') ? 'bot' : 'move';
+  const { startMin:S, endMin:E, snap } = state.settings;
+  const col0 = el.parentElement, m0 = minuteAt(col0, e.clientY);
+  const orig = { day:ev.day, start:ev.start, end:ev.end };
+  let cur = { ...orig }, moved = false;
+  const sx = e.clientX, sy = e.clientY;
+  const mv = p => {
+    if (!moved && Math.hypot(p.clientX - sx, p.clientY - sy) < 5) return;
+    if (!moved) { moved = true; el.classList.add('dragging'); el.style.left = '2px'; el.style.width = 'calc(100% - 4px)'; }
+    if (mode === 'move') {
+      const col = colAtX(p.clientX), dur = orig.end - orig.start;
+      let st = snapM(orig.start + minuteAt(col, p.clientY) - m0);
+      st = dur <= E - S ? clamp(st, S, E - dur) : clamp(st, 0, 1440 - dur);
+      cur = { day:+col.dataset.day, start:st, end:st + dur };
+      if (el.parentElement !== col) col.appendChild(el);
+    } else if (mode === 'bot') {
+      cur.end = clamp(snapM(minuteAt(col0, p.clientY)), orig.start + snap, 1440);
+      cur.end = Math.min(cur.end, Math.max(E, orig.end));
+    } else {
+      cur.start = clamp(snapM(minuteAt(col0, p.clientY)), Math.min(S, orig.start), orig.end - snap);
+    }
+    setEvGeom(el, cur.start, cur.end);
+  };
+  const up = () => {
+    window.removeEventListener('pointermove', mv);
+    window.removeEventListener('pointerup', up);
+    window.removeEventListener('pointercancel', up);
+    if (!moved) { openEdit(id); return; }
+    if (cur.day !== orig.day || cur.start !== orig.start || cur.end !== orig.end)
+      mutate(() => Object.assign(findEv(id), cur));
+    else render();
+  };
+  window.addEventListener('pointermove', mv);
+  window.addEventListener('pointerup', up);
+  window.addEventListener('pointercancel', up);
+}
+
+function startSelect(e, col){
+  const { startMin:S, endMin:E, snap } = state.settings;
+  const day = +col.dataset.day, m0 = minuteAt(col, e.clientY);
+  const sx = e.clientX, sy = e.clientY;
+  let moved = false, lo = 0, hi = 0;
+  const sel = document.createElement('div'); sel.className = 'sel';
+  const mv = p => {
+    if (!moved && Math.hypot(p.clientX - sx, p.clientY - sy) < 6) return;
+    if (!moved) { moved = true; col.appendChild(sel); }
+    const m = minuteAt(col, p.clientY);
+    lo = clamp(Math.floor(Math.min(m0, m)/snap)*snap, S, E);
+    hi = clamp(Math.ceil(Math.max(m0, m)/snap)*snap, S, E);
+    if (hi - lo < snap) hi = Math.min(E, lo + snap);
+    sel.style.top = pct(lo); sel.style.height = `calc(${(hi-lo)/(E-S)*100}% - 1px)`;
+    sel.textContent = `${fmt(lo)}〜${fmt(hi)}`;
+  };
+  const up = p => {
+    window.removeEventListener('pointermove', mv);
+    window.removeEventListener('pointerup', up);
+    window.removeEventListener('pointercancel', up);
+    if (moved) { openAddMenu(p.clientX, p.clientY, day, lo, hi, sel); return; }
+    sel.remove();
+    if (menuWasOpen) return;
+    const st = clamp(Math.floor(m0/30)*30, S, E - snap);
+    openAddMenu(p.clientX, p.clientY, day, st, Math.min(st + 60, E));
+  };
+  window.addEventListener('pointermove', mv);
+  window.addEventListener('pointerup', up);
+  window.addEventListener('pointercancel', up);
+}
+
+grid.addEventListener('contextmenu', e => {
+  e.preventDefault(); closeMenu();
+  const evEl = e.target.closest('.ev'), col = e.target.closest('.col'), head = e.target.closest('.dayhead');
+  if (evEl) openEventMenu(e.clientX, e.clientY, evEl.dataset.id);
+  else if (col) {
+    const { startMin:S, endMin:E, snap } = state.settings;
+    const st = clamp(Math.floor(minuteAt(col, e.clientY)/30)*30, S, E - snap);
+    openAddMenu(e.clientX, e.clientY, +col.dataset.day, st, Math.min(st + 60, E));
+  } else if (head) openDayMenu(e.clientX, e.clientY, +head.dataset.day);
+});
+grid.addEventListener('click', e => {
+  const b = e.target.closest('.copybtn');
+  if (b) { e.stopPropagation(); const r = b.getBoundingClientRect(); openDayMenu(r.left, r.bottom + 4, +b.dataset.day); }
+});
+
+/* ---------- context menus ---------- */
+let menuCleanup = null;
+function showMenu(x, y, html, onAction, cleanup){
+  closeMenu();
+  menu.innerHTML = html; menu.style.display = 'block';
+  menu.style.left = '0px'; menu.style.top = '0px';
+  const r = menu.getBoundingClientRect();
+  menu.style.left = clamp(x, 6, window.innerWidth - r.width - 6) + 'px';
+  menu.style.top = clamp(y, 6, window.innerHeight - r.height - 6) + 'px';
+  menu.onclick = ev => { const b = ev.target.closest('[data-act]'); if (!b) return; const a = b.dataset; closeMenu(); onAction(a.act, a.val); };
+  menuCleanup = cleanup || null;
+}
+function closeMenu(){
+  if (menu.style.display !== 'block') return;
+  menu.style.display = 'none'; menu.innerHTML = '';
+  if (menuCleanup) { menuCleanup(); menuCleanup = null; }
+}
+document.addEventListener('pointerdown', e => { if (!menu.contains(e.target) && !grid.contains(e.target)) closeMenu(); });
+window.addEventListener('resize', closeMenu);
+window.addEventListener('scroll', closeMenu, true);
+
+function usedTitles(){
+  const cnt = {}; state.events.forEach(e => cnt[e.title] = (cnt[e.title] || 0) + 1);
+  return Object.keys(cnt).sort((a,b) => cnt[b] - cnt[a]);
+}
+function openAddMenu(x, y, day, start, end, selEl){
+  const used = usedTitles();
+  const presets = PRESETS.filter(p => !used.includes(p));
+  const chip = (t, colored) => {
+    const c = colored ? state.colors[t] || '#ffffff' : '#ffffff';
+    return `<button class="chip" data-act="add" data-val="${esc(t)}" style="background:${c};color:${textColor(c)}">${esc(t)}</button>`;
+  };
+  let html = `<div class="hd">${DAYS[day]}曜 ${fmt(start)}〜${fmt(end)} に追加</div>`;
+  if (used.length) html += `<div class="hd">使用中の項目</div><div class="chips">${used.map(t => chip(t, true)).join('')}</div>`;
+  if (presets.length) html += `<div class="hd">よく使う項目</div><div class="chips">${presets.map(t => chip(t, false)).join('')}</div>`;
+  html += `<hr><button class="mi" data-act="new">新しい項目を入力…</button>`;
+  showMenu(x, y, html, (act, val) => {
+    if (act === 'add') mutate(() => { colorFor(val); state.events.push({ id:uid(), day, start, end, title:val, memo:'' }); });
+    else if (act === 'new') openEdit(null, { day, start, end });
+  }, selEl ? () => selEl.remove() : null);
+}
+function openEventMenu(x, y, id){
+  const ev = findEv(id); if (!ev) return;
+  const html = `<div class="hd">${esc(ev.title)}（${DAYS[ev.day]} ${fmt(ev.start)}〜${fmt(ev.end)}）</div>
+    <button class="mi" data-act="edit">編集</button>
+    <button class="mi" data-act="weekdays">月〜金すべてにコピー</button>
+    <button class="mi" data-act="all">毎日（月〜日）にコピー</button>
+    <button class="mi" data-act="pick">曜日を選んでコピー…</button>
+    <hr><button class="mi danger" data-act="del">削除</button>`;
+  showMenu(x, y, html, act => {
+    if (act === 'edit') openEdit(id);
+    else if (act === 'pick') openEdit(id, null, true);
+    else if (act === 'weekdays' || act === 'all') {
+      const days = act === 'all' ? [0,1,2,3,4,5,6] : [0,1,2,3,4];
+      mutate(() => copyEventTo(findEv(id), days));
+      toast('コピーしました');
+    } else if (act === 'del') mutate(() => { state.events = state.events.filter(e => e.id !== id); });
+  });
+}
+function copyEventTo(ev, days){
+  for (const d of days) {
+    if (d === ev.day) continue;
+    if (state.events.some(e => e.day === d && e.title === ev.title && e.start === ev.start && e.end === ev.end)) continue;
+    state.events.push({ ...ev, id:uid(), day:d });
+  }
+}
+function openDayMenu(x, y, day){
+  const n = state.events.filter(e => e.day === day).length;
+  const html = `<div class="hd">${DAYS[day]}曜日（${n}件）</div>
+    <button class="mi" data-act="copy">この曜日を他の曜日にコピー…</button>
+    <hr><button class="mi danger" data-act="clear">この曜日の予定をすべて削除</button>`;
+  showMenu(x, y, html, act => {
+    if (act === 'copy') openCopyDay(day);
+    else if (act === 'clear') {
+      if (n && confirm(`${DAYS[day]}曜日の予定 ${n}件 を削除しますか？`))
+        mutate(() => { state.events = state.events.filter(e => e.day !== day); });
+    }
+  });
+}
+
+/* ---------- dialogs ---------- */
+function timeOptions(sel, value, from, to){
+  const step = state.settings.snap, vals = [];
+  for (let m = from; m <= to; m += step) vals.push(m);
+  if (!vals.includes(value)) { vals.push(value); vals.sort((a,b) => a-b); }
+  sel.innerHTML = vals.map(m => `<option value="${m}">${fmt(m)}</option>`).join('');
+  sel.value = value;
+}
+function dayCheckboxes(container, exclude, checked = []){
+  container.innerHTML = DAYS.map((d,i) =>
+    `<label><input type="checkbox" value="${i}" ${i===exclude ? 'disabled' : ''} ${checked.includes(i) ? 'checked' : ''}> ${d}</label>`).join('');
+}
+let editing = null;
+function openEdit(id, preset, focusCopy){
+  closeMenu();
+  const ev = id ? findEv(id) : null;
+  const base = ev || { title:'', day:preset.day, start:preset.start, end:preset.end, memo:'' };
+  editing = { id };
+  $('dlgEditTitle').textContent = ev ? '予定の編集' : '新しい予定';
+  $('fTitle').value = base.title;
+  $('fColor').value = base.title && state.colors[base.title] ? state.colors[base.title] : nextColorPreview();
+  $('fDay').innerHTML = DAYS.map((d,i) => `<option value="${i}">${d}曜日</option>`).join('');
+  $('fDay').value = base.day;
+  timeOptions($('fStart'), base.start, 0, 1440 - state.settings.snap);
+  timeOptions($('fEnd'), base.end, state.settings.snap, 1440);
+  $('fMemo').value = base.memo || '';
+  $('fRenameAll').checked = false;
+  $('rowRename').style.display = ev && state.events.filter(e => e.title === ev.title).length > 1 ? '' : 'none';
+  $('fDelete').style.display = ev ? '' : 'none';
+  dayCheckboxes($('fCopyDays'), base.day);
+  $('dlgEdit').showModal();
+  if (focusCopy) $('fCopyDays').querySelector('input:not(:disabled)')?.focus();
+  else if (!ev) $('fTitle').focus();
+}
+function nextColorPreview(){
+  const used = new Set(Object.values(state.colors).map(c => c.toLowerCase()));
+  return PALETTE.find(p => !used.has(p)) || hslToHex((used.size*137.508)%360, 70, 74);
+}
+$('fTitle').addEventListener('input', () => { const c = state.colors[$('fTitle').value.trim()]; if (c) $('fColor').value = c; });
+$('fDay').addEventListener('change', () => {
+  const checked = [...$('fCopyDays').querySelectorAll('input:checked')].map(i => +i.value);
+  dayCheckboxes($('fCopyDays'), +$('fDay').value, checked);
+});
+$('fCancel').onclick = () => $('dlgEdit').close();
+$('fDelete').onclick = () => {
+  const id = editing.id; $('dlgEdit').close();
+  mutate(() => { state.events = state.events.filter(e => e.id !== id); });
+};
+$('fSave').onclick = () => {
+  const title = $('fTitle').value.trim();
+  if (!title) { alert('項目名を入力してください'); $('fTitle').focus(); return; }
+  const start = +$('fStart').value, end = +$('fEnd').value, day = +$('fDay').value;
+  if (end <= start) { alert('終了時刻は開始時刻より後にしてください'); return; }
+  const memo = $('fMemo').value.trim(), color = $('fColor').value;
+  const copyDays = [...$('fCopyDays').querySelectorAll('input:checked')].map(i => +i.value);
+  const renameAll = $('fRenameAll').checked;
+  const id = editing.id;
+  $('dlgEdit').close();
+  mutate(() => {
+    let ev;
+    if (id) {
+      ev = findEv(id);
+      if (renameAll && ev.title !== title) state.events.forEach(x => { if (x.title === ev.title) x.title = title; });
+      Object.assign(ev, { title, day, start, end, memo });
+    } else {
+      ev = { id:uid(), title, day, start, end, memo };
+      state.events.push(ev);
+    }
+    state.colors[title] = color;
+    if (copyDays.length) copyEventTo(ev, copyDays);
+  });
+};
+
+let copySrc = 0;
+function openCopyDay(day){
+  copySrc = day;
+  $('cdTitle').textContent = `${DAYS[day]}曜日の予定をコピー`;
+  dayCheckboxes($('cdDays'), day);
+  $('dlgCopyDay').showModal();
+}
+$('cdCancel').onclick = () => $('dlgCopyDay').close();
+$('cdOk').onclick = () => {
+  const days = [...$('cdDays').querySelectorAll('input:checked')].map(i => +i.value);
+  const overwrite = $('cdOverwrite').checked;
+  $('dlgCopyDay').close();
+  if (!days.length) return;
+  mutate(() => {
+    if (overwrite) state.events = state.events.filter(e => !days.includes(e.day));
+    const src = state.events.filter(e => e.day === copySrc);
+    for (const ev of src) copyEventTo(ev, days);
+  });
+  toast('コピーしました');
+};
+
+/* ---------- settings ---------- */
+function syncSettingsUI(){
+  const s = state.settings, half = [];
+  for (let m = 0; m <= 1440; m += 30) half.push(m);
+  $('setStart').innerHTML = half.filter(m => m < 1440).map(m => `<option value="${m}">${fmt(m)}</option>`).join('');
+  $('setEnd').innerHTML = half.filter(m => m > 0).map(m => `<option value="${m}">${fmt(m)}</option>`).join('');
+  if (![...$('setStart').options].some(o => +o.value === s.startMin)) $('setStart').add(new Option(fmt(s.startMin), s.startMin));
+  if (![...$('setEnd').options].some(o => +o.value === s.endMin)) $('setEnd').add(new Option(fmt(s.endMin), s.endMin));
+  $('setStart').value = s.startMin; $('setEnd').value = s.endMin;
+  $('setSnap').value = s.snap; $('setOrient').value = s.orientation;
+}
+function onRangeChange(){
+  const st = +$('setStart').value, en = +$('setEnd').value;
+  if (en - st < 60) { alert('開始と終了は1時間以上あけてください'); syncSettingsUI(); return; }
+  mutate(() => { state.settings.startMin = st; state.settings.endMin = en; });
+}
+$('setStart').onchange = onRangeChange;
+$('setEnd').onchange = onRangeChange;
+$('setSnap').onchange = () => mutate(() => { state.settings.snap = +$('setSnap').value; });
+$('setOrient').onchange = () => mutate(() => { state.settings.orientation = $('setOrient').value; });
+let titleTimer = null, titleSnap = null;
+$('titleInput').addEventListener('focus', () => { titleSnap = JSON.stringify(state); });
+$('titleInput').addEventListener('input', () => { state.title = $('titleInput').value; clearTimeout(titleTimer); titleTimer = setTimeout(save, 300); });
+$('titleInput').addEventListener('change', () => { if (titleSnap && JSON.parse(titleSnap).title !== state.title) history.push(titleSnap); save(); });
+$('titleInput').addEventListener('keydown', e => { if (e.key === 'Enter') e.target.blur(); });
+
+/* ---------- toolbar ---------- */
+$('btnUndo').onclick = undo;
+$('btnPrint').onclick = () => { closeMenu(); window.print(); };
+$('btnExport').onclick = () => {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type:'application/json' });
+  const a = document.createElement('a'); const d = new Date();
+  a.download = `weekly-plan-${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}.json`;
+  a.href = URL.createObjectURL(blob); document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  toast('JSONを保存しました');
+};
+$('btnImport').onclick = () => $('fileInput').click();
+$('fileInput').onchange = () => {
+  const f = $('fileInput').files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const d = normalize(JSON.parse(r.result));
+      mutate(() => { state = d; });
+      toast('読み込みました');
+    } catch(err) { alert('読み込めませんでした：' + err.message); }
+    $('fileInput').value = '';
+  };
+  r.readAsText(f, 'utf-8');
+};
+$('btnReset').onclick = () => {
+  if (!confirm('すべての予定と設定を消去して初期状態に戻します。\n（ブラウザに保存したデータも削除されます）\nよろしいですか？')) return;
+  history.push(JSON.stringify(state));
+  state = defaultState();
+  try { localStorage.removeItem(LS_KEY); } catch(e) {}
+  syncSettingsUI(); render(); toast('初期化しました');
+};
+$('btnSample').onclick = () => {
+  if (state.events.length && !confirm('現在の予定をサンプルに置き換えますか？')) return;
+  mutate(() => { state = sampleState(); });
+};
+function sampleState(){
+  const s = defaultState(); s.title = '太郎の週間予定表';
+  const add = (days, st, en, title, memo='') => days.forEach(d => s.events.push({ id:uid(), day:d, start:st, end:en, title, memo }));
+  const t = (h,m=0) => h*60 + m, WD = [0,1,2,3,4], WE = [5,6];
+  add(WD, t(6,30), t(7), '起床');
+  add(WD, t(7), t(7,30), '食事');
+  add(WD, t(8), t(15,30), '学校');
+  add([0,2,4], t(15,45), t(16,30), '宿題');
+  add([1,3], t(15,45), t(16,15), '宿題');
+  add([0], t(16,45), t(17,45), 'ピアノ');
+  add([2], t(16,45), t(17,45), 'スイミング');
+  add([1,3], t(16,15), t(17,30), '遊び');
+  add([4], t(16,30), t(17,30), '遊び');
+  add(WD, t(18,30), t(19,15), '食事');
+  add(WD, t(19,30), t(20), 'お風呂');
+  add(WD, t(20), t(20,30), '読書');
+  add(WD, t(21), t(21,30), '就寝');
+  add(WE, t(7), t(7,30), '起床');
+  add(WE, t(7,30), t(8), '食事');
+  add(WE, t(9), t(10), '勉強', 'ドリル');
+  add([5], t(10), t(12), '遊び', '公園');
+  add([6], t(10), t(11), 'お手伝い');
+  add(WE, t(12), t(13), '食事');
+  add(WE, t(14), t(15), 'テレビ・ゲーム');
+  add(WE, t(18,30), t(19,15), '食事');
+  add(WE, t(19,30), t(20), 'お風呂');
+  add(WE, t(21), t(21,30), '就寝');
+  [...new Set(s.events.map(e => e.title))].forEach((tt,i) => s.colors[tt] = PALETTE[i % PALETTE.length]);
+  return s;
+}
+
+/* ---------- misc ---------- */
+let toastTimer = null;
+function toast(msg){
+  const el = $('toast'); el.textContent = msg; el.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 1600);
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeMenu();
+  const typing = /INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName || '');
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !typing && !document.querySelector('dialog[open]')) { e.preventDefault(); undo(); }
+});
+window.addEventListener('beforeprint', () => { closeMenu(); render(); });
+window.addEventListener('afterprint', render);
+
+syncSettingsUI();
+render();
+})();
+</script>
+</body>
+</html>

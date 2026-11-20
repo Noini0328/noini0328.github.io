@@ -30,3 +30,5 @@
 [ひらがな、カタカナプリント](https://noini0328.github.io/education/kana_print.html)
 
 [漢字プリント生成](https://noini0328.github.io/education/kanji_print.html)
+
+[週間予定表生成](https://noini0328.github.io/education/weekly_planner.html)
